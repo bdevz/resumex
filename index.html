@@ -385,6 +385,58 @@
       margin-top: 6px;
     }
 
+    .progress-steps {
+      max-width: 340px;
+      margin: 24px auto 0;
+      text-align: left;
+    }
+
+    .progress-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+      transition: color 0.3s;
+    }
+
+    .progress-step.active {
+      color: var(--accent);
+    }
+
+    .progress-step.done {
+      color: var(--green);
+    }
+
+    .step-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+      transition: all 0.3s;
+    }
+
+    .progress-step.active .step-icon {
+      border-color: var(--accent);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .progress-step.done .step-icon {
+      border-color: var(--green);
+      background: var(--green-dim);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
     /* ── Error ── */
     .error-box {
       padding: 16px 20px;
@@ -641,8 +693,13 @@
     <!-- Loading -->
     <div id="loading">
       <div class="spinner"></div>
-      <div class="loading-text">Generating your resume...</div>
-      <div class="loading-sub">Analyzing JD, building work history, scoring bullets (15-30 seconds)</div>
+      <div class="loading-text" id="loading-text">Generating your resume...</div>
+      <div class="progress-steps" id="progress-steps">
+        <div class="progress-step" id="step-analyze"><span class="step-icon"></span> Analyzing job description</div>
+        <div class="progress-step" id="step-connect"><span class="step-icon"></span> Connecting to AI</div>
+        <div class="progress-step" id="step-write"><span class="step-icon"></span> Writing resume</div>
+        <div class="progress-step" id="step-score"><span class="step-icon"></span> Scoring bullets &amp; validating</div>
+      </div>
     </div>
 
     <!-- Results -->
@@ -753,10 +810,10 @@
       document.getElementById("ats-warning").style.display = tmpl && !tmpl.ats ? "block" : "none";
     }
 
-    // ── API base — set this to your Lambda Function URL ──
-    // After deploying, replace this with your actual URL like:
-    //   https://abc123xyz.lambda-url.us-east-1.on.aws
-    // The deploy script will do this automatically.
+    // ── API URLs ──
+    // STREAM_BASE: CloudFront proxies /api/* to the streaming Lambda (no 30s timeout)
+    // API_BASE: API Gateway for fast endpoints (build, models)
+    const STREAM_BASE = "";  // relative — same CloudFront origin
     const API_BASE = "%%LAMBDA_URL%%";
 
     // ── Auth ──
@@ -802,7 +859,27 @@
     // Render template selector on load
     renderTemplateGrid();
 
-    // ── Generate ──
+    // ── Progress step helpers ──
+    function setStep(stepId, state) {
+      var el = document.getElementById(stepId);
+      if (!el) return;
+      el.className = "progress-step" + (state ? " " + state : "");
+      if (state === "done") {
+        el.querySelector(".step-icon").textContent = "\u2713";
+      }
+    }
+
+    function resetSteps() {
+      ["step-analyze", "step-connect", "step-write", "step-score"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.className = "progress-step";
+          el.querySelector(".step-icon").textContent = "";
+        }
+      });
+    }
+
+    // ── Generate (SSE streaming via CloudFront) ──
     async function generate() {
       const jd = document.getElementById("jd-input").value.trim();
       const customer = document.getElementById("customer-input").value.trim();
@@ -815,12 +892,16 @@
       }
 
       hideError();
+      resetSteps();
       document.getElementById("main-form").style.display = "none";
       document.getElementById("loading").style.display = "block";
       document.getElementById("results").style.display = "none";
+      document.getElementById("loading-text").textContent = "Generating your resume...";
+
+      setStep("step-analyze", "active");
 
       try {
-        const resp = await fetch(API_BASE + "/analyze", {
+        const resp = await fetch(STREAM_BASE + "/api/analyze", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -838,14 +919,80 @@
           throw new Error("Invalid passphrase. Check with the person who set up the tool.");
         }
 
-        const data = await resp.json();
-
         if (!resp.ok) {
-          throw new Error(data.error || data.details || `Server error (${resp.status})`);
+          var errBody = await resp.text();
+          try { errBody = JSON.parse(errBody).error || errBody; } catch(e) {}
+          throw new Error(errBody || "Server error (" + resp.status + ")");
         }
 
-        currentResumeData = data.resumeData;
-        renderResults(data);
+        setStep("step-analyze", "done");
+        setStep("step-connect", "active");
+
+        // Read SSE stream
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalData = null;
+        let gotContent = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") continue;
+
+            try {
+              const evt = JSON.parse(raw);
+
+              if (evt.type === "status") {
+                if (evt.message && evt.message.includes("writing")) {
+                  setStep("step-connect", "done");
+                  setStep("step-write", "active");
+                  document.getElementById("loading-text").textContent = "AI is writing your resume...";
+                } else if (evt.message && evt.message.includes("Connecting")) {
+                  setStep("step-connect", "active");
+                }
+              }
+
+              if (evt.type === "content" && !gotContent) {
+                gotContent = true;
+                setStep("step-connect", "done");
+                setStep("step-write", "active");
+                document.getElementById("loading-text").textContent = "AI is writing your resume...";
+              }
+
+              if (evt.type === "complete") {
+                setStep("step-write", "done");
+                setStep("step-score", "active");
+                document.getElementById("loading-text").textContent = "Scoring and validating...";
+                finalData = evt;
+              }
+
+              if (evt.type === "error") {
+                throw new Error(evt.error || "AI returned an error");
+              }
+            } catch (parseErr) {
+              if (parseErr.message && !parseErr.message.includes("JSON")) throw parseErr;
+            }
+          }
+        }
+
+        if (!finalData || !finalData.resumeData) {
+          throw new Error("No resume data received. Try again.");
+        }
+
+        setStep("step-score", "done");
+        document.getElementById("loading-text").textContent = "Done!";
+
+        currentResumeData = finalData.resumeData;
+        renderResults(finalData);
 
       } catch (err) {
         showError(err.message);
