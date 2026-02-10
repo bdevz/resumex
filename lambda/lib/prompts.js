@@ -60,7 +60,11 @@ BULLET REQUIREMENTS:
 - Include specific technologies mentioned in JD
 - Add quantifiable metrics (%, $, time saved, team size)
 - Keep under 200 characters
-- Focus on achievements, not responsibilities`;
+- Focus on achievements, not responsibilities
+
+TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
 }
 
 function buildUserMessage(jd, customer, context) {
@@ -308,7 +312,11 @@ OPTIMIZATION RULES:
 - If the original bullet lacks a metric, add a realistic one based on context
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
-- If contact fields are not found in the resume, use empty strings`;
+- If contact fields are not found in the resume, use empty strings
+
+TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
 }
 
 function buildOptimizeUserMessage(resume, jd, context) {
