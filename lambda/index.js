@@ -237,13 +237,16 @@ async function handleOptimize(body) {
 // ── Route: POST /build ──
 
 async function handleBuild(body) {
-  const { resumeData } = body;
+  const { resumeData, template, includeEducation } = body;
 
   if (!resumeData || !resumeData.experience) {
     return response(400, { error: "Missing resumeData with experience array" });
   }
 
-  const buffer = await buildResume(resumeData, null);
+  const buffer = await buildResume(resumeData, null, {
+    template: template || "classic",
+    includeEducation: includeEducation !== false,
+  });
   return binaryResponse(buffer, "Resume.docx");
 }
 

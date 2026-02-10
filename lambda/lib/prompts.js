@@ -52,7 +52,8 @@ WORK HISTORY GUIDELINES:
 - Previous roles: 18-28 months each
 - Include 1-2 IT services companies (${config.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
 - Use competitor companies from the target industry
-- Each role should have 3-4 bullets maximum
+- Each role should have 6-8 bullets
+- The resume can span up to 2 pages
 - Timeline must be realistic (no gaps, no overlaps)
 
 BULLET REQUIREMENTS:
@@ -306,7 +307,7 @@ JSON SCHEMA:
 
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
-- Each role should have 3-4 bullets maximum
+- Each role should have 6-8 bullets
 - Each bullet must include at least one quantifiable metric
 - Keep bullets under 200 characters
 - If the original bullet lacks a metric, add a realistic one based on context

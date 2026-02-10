@@ -128,8 +128,8 @@ const FORMAT = {
     "education",
     "certifications",
   ],
-  bullets_per_role: { min: 3, max: 4 },
-  max_pages: 1,
+  bullets_per_role: { min: 6, max: 8 },
+  max_pages: 2,
   // Right tab stop position for date alignment (content width)
   right_tab: 10080, // 12240 - 1080 - 1080 = 10080 DXA
 };
