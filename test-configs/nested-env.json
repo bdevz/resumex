@@ -1,0 +1,1 @@
+{"application":{"name":"nested-env-app","type":"fullstack"},"frontend":{"source_dir":"./dist"},"backend":{"source_dir":"./src","handler":"index.handler","environment_variables":{"NESTED_VALUE":"${TEST_NESTED_VAR}","FALLBACK_VALUE":"${UNDEFINED_VAR:-fallback-value}"}},"deployment":{"tags":{"Environment":"${TEST_TAG_VALUE}","Project":"${PROJECT_NAME:-default-project}"}}}

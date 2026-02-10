@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: use word boundary regex for tech timeline validation\n\nSubstring matching \\(.includes\\(\\)\\) caused false positives where \"rag\"\nmatched words like \"storage\" and \"coverage\", triggering incorrect\nanachronism warnings on nearly every resume. Replace with \\\\b word\nboundary regex for all TECH_TIMELINE keywords.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git rebase --root --exec 'git commit --amend -m \"\"$\\(git log --format=%B -n1 | sed \"\"/^Co-Authored-By:/d\"\" | sed \"\"/^$/N;/^\\\\n$/d\"\"\\)\"\"')",
+      "Bash(git stash:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git push:*)",
+      "Bash(git cat-file:*)"
+    ]
+  }
+}

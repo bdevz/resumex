@@ -1,0 +1,37 @@
+# AWS Deployment Template Configuration
+# Example configuration for a full-stack web application
+
+application:
+  name: my-web-app
+  type: fullstack
+  version: 1.0.0
+
+aws:
+  region: us-east-1
+  # profile: default  # Uncomment to use a specific AWS profile
+
+frontend:
+  source_dir: ./dist
+  index_file: index.html
+  build_command: npm run build
+  # custom_domain: example.com  # Uncomment to use a custom domain
+
+backend:
+  source_dir: ./src
+  handler: index.handler
+  runtime: nodejs18.x
+  timeout: 30
+  memory: 128
+  environment_variables:
+    NODE_ENV: production
+    API_VERSION: v1
+    # Add your environment variables here
+
+deployment:
+  stack_name: my-web-app-stack
+  enable_monitoring: true
+  tags:
+    Environment: production
+    Project: my-web-app
+    Owner: development-team
+    # Add your custom tags here

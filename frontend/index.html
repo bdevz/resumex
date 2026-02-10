@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResumeX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #181a20;
+      --surface-2: #1e2028;
+      --surface-3: #252830;
+      --border: #2a2d38;
+      --border-focus: #4a7cff;
+      --text: #e8e9ec;
+      --text-dim: #8b8f9a;
+      --text-muted: #5a5e6a;
+      --accent: #4a7cff;
+      --accent-dim: #3a5cc0;
+      --green: #34d399;
+      --green-dim: #064e3b;
+      --amber: #fbbf24;
+      --amber-dim: #78350f;
+      --red: #f87171;
+      --red-dim: #7f1d1d;
+      --radius: 10px;
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    header {
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+
+    /* ── Auth gate ── */
+    #auth-gate {
+      margin-bottom: 32px;
+    }
+
+    .auth-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .auth-row input {
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .auth-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .auth-status.ok {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238b8f9a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 44px;
+    }
+
+    .field-group {
+      margin-bottom: 24px;
+    }
+
+    .field-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ── Buttons ── */
+    button {
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      padding: 14px 32px;
+      font-size: 16px;
+    }
+
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 12px 24px;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--surface-3); }
+
+    .btn-small {
+      padding: 6px 14px;
+      font-size: 13px;
+      background: var(--surface-2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+
+    .btn-small:hover { color: var(--text); }
+
+    /* ── Results ── */
+    #results {
+      display: none;
+      margin-top: 48px;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .results-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .meta-item {
+      padding: 12px;
+      background: var(--surface-2);
+      border-radius: 8px;
+    }
+
+    .meta-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .meta-value {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    /* ── Experience preview ── */
+    .exp-entry {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .exp-entry:last-child { border-bottom: none; }
+
+    .exp-company {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .exp-title {
+      color: var(--text-dim);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .exp-dates {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .bullet-item {
+      display: flex;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .bullet-score {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .score-excellent { background: var(--green-dim); color: var(--green); }
+    .score-good { background: rgba(74, 124, 255, 0.15); color: var(--accent); }
+    .score-needs { background: var(--amber-dim); color: var(--amber); }
+    .score-rewrite { background: var(--red-dim); color: var(--red); }
+
+    .bullet-text {
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    /* ── Score summary ── */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--surface-2);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .score-number {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .score-label {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ── Timeline warnings ── */
+    .warning-item {
+      padding: 10px 14px;
+      background: var(--amber-dim);
+      border-radius: 8px;
+      color: var(--amber);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Animated progress display ── */
+    #progress {
+      display: none;
+      margin-top: 32px;
+    }
+
+    .progress-phases {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 24px;
+    }
+
+    .progress-phase {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      font-size: 14px;
+      color: var(--text-muted);
+      transition: all 0.4s ease;
+    }
+
+    .progress-phase:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+    .progress-phase:last-child { border-bottom: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); }
+
+    .progress-phase.active {
+      background: var(--surface-2);
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .progress-phase.done {
+      color: var(--text-dim);
+    }
+
+    .phase-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .phase-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-bar-outer {
+      height: 3px;
+      background: var(--surface);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 2px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    .progress-time {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: var(--mono);
+      margin-top: 12px;
+    }
+
+    /* ── Results reveal animation ── */
+    .section.reveal {
+      animation: slideUp 0.4s ease both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Error ── */
+    .error-box {
+      padding: 16px 20px;
+      background: var(--red-dim);
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      border-radius: var(--radius);
+      color: var(--red);
+      font-size: 14px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 32px 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ── Mode toggle tabs ── */
+    .mode-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      color: var(--text-dim);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .mode-tab:hover { color: var(--text); }
+
+    .mode-tab.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* ── File upload ── */
+    .upload-area {
+      position: relative;
+      margin-top: 8px;
+    }
+
+    .upload-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--surface-2);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--text-dim);
+      font-family: var(--font);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .upload-btn input[type="file"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .upload-status {
+      font-size: 13px;
+      color: var(--green);
+      margin-top: 6px;
+      display: none;
+    }
+
+    /* ── Skills tags ── */
+    .skills-row {
+      margin-bottom: 10px;
+    }
+
+    .skills-category {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-right: 8px;
+    }
+
+    .skills-list {
+      font-size: 13px;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+
+    /* ── Client sub-entry ── */
+    .client-entry {
+      margin-left: 20px;
+      padding-left: 16px;
+      border-left: 2px solid var(--border);
+      margin-top: 8px;
+    }
+
+    .client-name {
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>ResumeX</h1>
+      <p>ATS-optimized resumes with Google XYZ formula bullets</p>
+    </header>
+
+    <!-- Auth -->
+    <div id="auth-gate">
+      <div id="auth-form">
+        <label>Team passphrase</label>
+        <div class="auth-row">
+          <input type="password" id="passphrase" placeholder="Enter passphrase" autocomplete="off">
+          <button class="btn-primary" onclick="authenticate()" style="padding: 12px 24px;">Unlock</button>
+        </div>
+        <p class="field-hint">Get this from the person who set up the tool</p>
+      </div>
+      <div id="auth-ok" class="auth-status ok" style="display:none;">
+        Unlocked
+        <button class="btn-small" onclick="logout()">Change</button>
+      </div>
+    </div>
+
+    <!-- Main form -->
+    <div id="main-form" style="display:none;">
+      <!-- Mode toggle -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-optimize" onclick="setMode('optimize')">Optimize Mine</button>
+        <button class="mode-tab" id="tab-generate" onclick="setMode('generate')">Generate New</button>
+      </div>
+
+      <!-- Resume input (optimize mode only) -->
+      <div class="field-group" id="resume-field">
+        <label>Your Resume</label>
+        <textarea id="resume-input" placeholder="Paste your resume text here..." style="min-height:180px;"></textarea>
+        <div class="upload-area">
+          <label class="upload-btn">
+            Upload PDF or DOCX instead
+            <input type="file" id="resume-file" accept=".pdf,.docx" onchange="handleFileUpload(event)">
+          </label>
+          <div class="upload-status" id="upload-status"></div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Job Description</label>
+        <textarea id="jd-input" placeholder="Paste the full job description here..."></textarea>
+      </div>
+
+      <div class="two-col">
+        <div class="field-group" id="customer-field">
+          <label>Target Company</label>
+          <input type="text" id="customer-input" placeholder="e.g., Netflix, JPMorgan Chase">
+          <p class="field-hint">Helps pick competitor companies for work history</p>
+        </div>
+        <div class="field-group">
+          <label>Model</label>
+          <select id="model-select">
+            <option value="claude-sonnet">Claude Sonnet (recommended)</option>
+            <option value="claude-haiku">Claude Haiku (faster, cheaper)</option>
+            <option value="claude-opus">Claude Opus (most capable)</option>
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="gpt-4.1">GPT-4.1</option>
+            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+            <option value="gemini-2-flash">Gemini 2 Flash</option>
+            <option value="gemini-2-pro">Gemini 2 Pro</option>
+            <option value="deepseek-v3">DeepSeek V3</option>
+            <option value="deepseek-r1">DeepSeek R1</option>
+            <option value="llama-3.3-70b">Llama 3.3 70B</option>
+            <option value="mistral-large">Mistral Large</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Extra context <span style="color:var(--text-muted);text-transform:none;font-weight:400;">(optional)</span></label>
+        <input type="text" id="context-input" placeholder='e.g., "focus on backend", "heavy on Kubernetes", "Azure preferred"'>
+      </div>
+
+      <button class="btn-primary" id="generate-btn" onclick="generate()">
+        Optimize Resume
+      </button>
+
+      <div class="error-box" id="error-box"></div>
+    </div>
+
+    <!-- Animated progress -->
+    <div id="progress">
+      <div class="progress-phases" id="progress-phases">
+        <div class="progress-phase" data-phase="0">
+          <div class="phase-icon"></div>
+          <span>Reading job description...</span>
+        </div>
+        <div class="progress-phase" data-phase="1">
+          <div class="phase-icon"></div>
+          <span>Analyzing requirements &amp; keywords</span>
+        </div>
+        <div class="progress-phase" data-phase="2">
+          <div class="phase-icon"></div>
+          <span>Building work experience with XYZ bullets</span>
+        </div>
+        <div class="progress-phase" data-phase="3">
+          <div class="phase-icon"></div>
+          <span>Optimizing for ATS compatibility</span>
+        </div>
+        <div class="progress-phase" data-phase="4">
+          <div class="phase-icon"></div>
+          <span>Scoring bullet quality</span>
+        </div>
+      </div>
+      <div class="progress-bar-outer">
+        <div class="progress-bar-inner" id="progress-bar"></div>
+      </div>
+      <div class="progress-time" id="progress-time">0s</div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="results-header">
+        <h2 id="results-title">Optimized Resume</h2>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+          <button class="btn-secondary" onclick="startOver()">Start Over</button>
+        </div>
+      </div>
+
+      <!-- Meta -->
+      <div class="section">
+        <div class="section-title">Detected from JD</div>
+        <div class="meta-grid" id="meta-grid"></div>
+      </div>
+
+      <!-- Score -->
+      <div class="section">
+        <div class="section-title">Bullet Quality</div>
+        <div class="score-bar">
+          <div class="score-number" id="avg-score">—</div>
+          <div>
+            <div style="font-weight:600;">Average Score</div>
+            <div class="score-label" id="score-count">across 0 bullets (out of 7)</div>
+          </div>
+        </div>
+        <div id="timeline-warnings"></div>
+      </div>
+
+      <!-- Professional Summary -->
+      <div class="section">
+        <div class="section-title">Professional Summary</div>
+        <p id="summary-text" style="font-size:14px;line-height:1.7;"></p>
+      </div>
+
+      <!-- Skills -->
+      <div class="section">
+        <div class="section-title">Technical Skills</div>
+        <div id="skills-container"></div>
+      </div>
+
+      <!-- Experience -->
+      <div class="section">
+        <div class="section-title">Experience</div>
+        <div id="experience-container"></div>
+      </div>
+
+      <!-- Download again -->
+      <div style="text-align:center;margin-top:24px;">
+        <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+      </div>
+    </div>
+
+    <div class="footer" id="footer-text">
+      Review all details carefully before sending. AI-optimized content should be verified for accuracy.
+    </div>
+  </div>
+
+  <script>
+    // ── State ──
+    let currentResumeData = null;
+    let currentPassphrase = null;
+    let currentMode = "optimize"; // "optimize" or "generate"
+
+    // ── API base ──
+    const API_BASE = "%%LAMBDA_URL%%";
+    let progressTimer = null;
+    let progressPhase = -1;
+    let progressStartTime = 0;
+
+    // ── pdf.js worker ──
+    if (typeof pdfjsLib !== "undefined") {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+
+    // ── Auth ──
+    function authenticate() {
+      const pp = document.getElementById("passphrase").value.trim();
+      if (!pp) return;
+      currentPassphrase = pp;
+      // Save to sessionStorage so it survives page reload within the session
+      try { sessionStorage.setItem("rg_pp", pp); } catch(e) {}
+      showAuthenticated();
+    }
+
+    function showAuthenticated() {
+      document.getElementById("auth-form").style.display = "none";
+      document.getElementById("auth-ok").style.display = "inline-flex";
+      document.getElementById("main-form").style.display = "block";
+    }
+
+    function logout() {
+      currentPassphrase = null;
+      try { sessionStorage.removeItem("rg_pp"); } catch(e) {}
+      document.getElementById("auth-form").style.display = "block";
+      document.getElementById("auth-ok").style.display = "none";
+      document.getElementById("main-form").style.display = "none";
+      document.getElementById("results").style.display = "none";
+      document.getElementById("passphrase").value = "";
+    }
+
+    // Check for saved passphrase on load
+    try {
+      const saved = sessionStorage.getItem("rg_pp");
+      if (saved) {
+        currentPassphrase = saved;
+        showAuthenticated();
+      }
+    } catch(e) {}
+
+    // Also support Enter key on passphrase input
+    document.getElementById("passphrase").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") authenticate();
+    });
+
+    // ── Mode switching ──
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById("tab-optimize").classList.toggle("active", mode === "optimize");
+      document.getElementById("tab-generate").classList.toggle("active", mode === "generate");
+      document.getElementById("resume-field").style.display = mode === "optimize" ? "block" : "none";
+      document.getElementById("customer-field").style.display = mode === "generate" ? "block" : "none";
+      document.getElementById("generate-btn").textContent = mode === "optimize" ? "Optimize Resume" : "Generate Resume";
+    }
+
+    // Initialize mode on load
+    setMode("optimize");
+
+    // ── File upload ──
+    async function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById("upload-status");
+      statusEl.style.display = "block";
+      statusEl.style.color = "var(--text-dim)";
+      statusEl.textContent = "Reading file...";
+
+      try {
+        let text = "";
+        const ext = file.name.split(".").pop().toLowerCase();
+
+        if (ext === "pdf") {
+          text = await extractPdfText(file);
+        } else if (ext === "docx") {
+          text = await extractDocxText(file);
+        } else {
+          throw new Error("Unsupported file type. Use PDF or DOCX.");
+        }
+
+        if (text.trim().length < 50) {
+          throw new Error("Could not extract enough text from the file. Try pasting your resume text instead.");
+        }
+
+        document.getElementById("resume-input").value = text;
+        statusEl.style.color = "var(--green)";
+        statusEl.textContent = `Loaded ${file.name} (${text.length} characters)`;
+      } catch (err) {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = err.message;
+      }
+    }
+
+    async function extractPdfText(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(" ") + "\n";
+      }
+      return text.trim();
+    }
+
+    async function extractDocxText(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value.trim();
+    }
+
+    // ── Progress animation ──
+    function startProgress() {
+      progressPhase = -1;
+      progressStartTime = Date.now();
+
+      // Reset all phases
+      document.querySelectorAll(".progress-phase").forEach(el => {
+        el.classList.remove("active", "done");
+        el.querySelector(".phase-icon").innerHTML = "";
+      });
+      document.getElementById("progress-bar").style.width = "0%";
+      document.getElementById("progress-time").textContent = "0s";
+      document.getElementById("progress").style.display = "block";
+
+      // Phase timings (ms after start)
+      const phaseTimes = [0, 2000, 5000, 10000, 18000];
+      const totalPhases = 5;
+
+      advancePhase(); // Start first phase immediately
+
+      progressTimer = setInterval(() => {
+        const elapsed = Date.now() - progressStartTime;
+        document.getElementById("progress-time").textContent = `${Math.floor(elapsed / 1000)}s`;
+
+        // Advance phases based on time
+        const nextPhase = progressPhase + 1;
+        if (nextPhase < totalPhases && elapsed >= phaseTimes[nextPhase]) {
+          advancePhase();
+        }
+
+        // Smooth progress bar (0-90%, last 10% on completion)
+        const progress = Math.min(90, (elapsed / 30000) * 90);
+        document.getElementById("progress-bar").style.width = `${progress}%`;
+      }, 200);
+    }
+
+    function advancePhase() {
+      // Mark current phase as done
+      if (progressPhase >= 0) {
+        const prev = document.querySelector(`.progress-phase[data-phase="${progressPhase}"]`);
+        if (prev) {
+          prev.classList.remove("active");
+          prev.classList.add("done");
+          prev.querySelector(".phase-icon").innerHTML = "&#10003;";
+        }
+      }
+
+      progressPhase++;
+      const next = document.querySelector(`.progress-phase[data-phase="${progressPhase}"]`);
+      if (next) {
+        next.classList.add("active");
+        next.querySelector(".phase-icon").innerHTML = '<div class="phase-spinner"></div>';
+      }
+    }
+
+    function stopProgress() {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+
+      // Mark all phases as done
+      document.querySelectorAll(".progress-phase").forEach(el => {
+        el.classList.remove("active");
+        el.classList.add("done");
+        el.querySelector(".phase-icon").innerHTML = "&#10003;";
+      });
+
+      // Complete the progress bar
+      document.getElementById("progress-bar").style.width = "100%";
+
+      const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+      document.getElementById("progress-time").textContent = `Done in ${elapsed}s`;
+    }
+
+    // ── Generate ──
+    async function generate() {
+      const jd = document.getElementById("jd-input").value.trim();
+      const model = document.getElementById("model-select").value;
+      const context = document.getElementById("context-input").value.trim();
+
+      if (!jd || jd.length < 50) {
+        showError("Please paste a job description (at least 50 characters).");
+        return;
+      }
+
+      if (currentMode === "optimize") {
+        const resume = document.getElementById("resume-input").value.trim();
+        if (!resume || resume.length < 100) {
+          showError("Please paste your resume or upload a file (at least 100 characters).");
+          return;
+        }
+      }
+
+      hideError();
+      document.getElementById("main-form").style.display = "none";
+      document.getElementById("results").style.display = "none";
+
+      // Start animated progress
+      startProgress();
+
+      // Build request
+      let endpoint, payload;
+      if (currentMode === "optimize") {
+        endpoint = "/optimize";
+        payload = {
+          resume: document.getElementById("resume-input").value.trim(),
+          jd, model,
+          context: context || undefined,
+        };
+      } else {
+        endpoint = "/analyze";
+        const customer = document.getElementById("customer-input").value.trim();
+        payload = {
+          jd, model,
+          customer: customer || undefined,
+          context: context || undefined,
+        };
+      }
+
+      const maxRetries = 1;
+      let lastErr = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            // Retry after 503 timeout
+            document.getElementById("progress-time").textContent = "Retrying (AI needed more time)...";
+          }
+
+          const resp = await fetch(API_BASE + endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Passphrase": currentPassphrase,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (resp.status === 401) throw new Error("Invalid passphrase.");
+
+          // 503 = API Gateway timed out waiting for Lambda — retry once
+          if (resp.status === 503 && attempt < maxRetries) {
+            lastErr = new Error("AI is taking longer than expected. Retrying...");
+            continue;
+          }
+
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || `Server error (${resp.status})`);
+
+          stopProgress();
+          currentResumeData = data.resumeData;
+
+          // Brief pause before showing results
+          await new Promise(r => setTimeout(r, 600));
+          document.getElementById("progress").style.display = "none";
+          renderResults(data);
+          return;
+
+        } catch (err) {
+          lastErr = err;
+          // Only retry on network/503 errors
+          if (attempt < maxRetries && (err.message.includes("503") || err.message.includes("Failed to fetch") || err.message.includes("NetworkError"))) {
+            continue;
+          }
+          break;
+        }
+      }
+
+      // All retries exhausted
+      stopProgress();
+      document.getElementById("progress").style.display = "none";
+      const errMsg = lastErr?.message?.includes("503")
+        ? "The AI model took too long to respond. Try again with a shorter job description or a faster model (Claude Haiku or GPT-4o Mini)."
+        : lastErr?.message || "Unknown error";
+      showError(errMsg);
+      document.getElementById("main-form").style.display = "block";
+    }
+
+    // ── Render results ──
+    function renderResults(data) {
+      const { resumeData, scoring, timeline_warnings, model_used, usage } = data;
+
+      // Update title based on mode
+      document.getElementById("results-title").textContent = data.mode === "optimize" ? "Optimized Resume" : "Generated Resume";
+
+      // Meta
+      const pjd = resumeData.parsed_jd || {};
+      const metaGrid = document.getElementById("meta-grid");
+      metaGrid.innerHTML = "";
+      const metaItems = [
+        ["Mode", data.mode === "optimize" ? "Optimized" : "Generated"],
+        ["Role", pjd.role_title || "—"],
+        ["Industry", pjd.industry || "—"],
+        ["Cloud", (pjd.cloud_platform || "—").toUpperCase()],
+        ["Model", model_used || "—"],
+      ];
+      if (usage) {
+        const cost = ((usage.prompt_tokens || 0) * 0.000003 + (usage.completion_tokens || 0) * 0.000015).toFixed(3);
+        metaItems.push(["Tokens", `${usage.prompt_tokens || "?"}/${usage.completion_tokens || "?"}`]);
+        metaItems.push(["Est. Cost", `${cost}`]);
+      }
+      for (const [label, value] of metaItems) {
+        metaGrid.innerHTML += `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
+      }
+
+      // Score
+      document.getElementById("avg-score").textContent = scoring.average;
+      document.getElementById("score-count").textContent = `across ${scoring.bulletCount} bullets (out of 7)`;
+
+      // Timeline warnings
+      const warningsEl = document.getElementById("timeline-warnings");
+      warningsEl.innerHTML = "";
+      if (timeline_warnings.length > 0) {
+        for (const w of timeline_warnings) {
+          warningsEl.innerHTML += `<div class="warning-item">${w}</div>`;
+        }
+      }
+
+      // Summary
+      document.getElementById("summary-text").textContent = resumeData.professional_summary || "";
+
+      // Skills
+      const skillsEl = document.getElementById("skills-container");
+      skillsEl.innerHTML = "";
+      if (resumeData.technical_skills) {
+        for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
+          skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${cat}:</span><span class="skills-list">${skills}</span></div>`;
+        }
+      }
+
+      // Experience
+      const expEl = document.getElementById("experience-container");
+      expEl.innerHTML = "";
+
+      // Build scoring lookup
+      const scoringMap = {};
+      if (scoring.results) {
+        for (const company of scoring.results) {
+          for (const b of company.bullets) {
+            scoringMap[b.text] = b;
+          }
+        }
+      }
+
+      for (const exp of resumeData.experience) {
+        let html = `<div class="exp-entry">`;
+        html += `<div class="exp-company">${exp.company} <span class="exp-dates">${exp.start_date} — ${exp.end_date}</span></div>`;
+
+        if (exp.is_consulting && exp.clients) {
+          html += `<div class="exp-title">${exp.title || "Software Engineer"} &middot; ${exp.location || ""}</div>`;
+          for (const client of exp.clients) {
+            html += `<div class="client-entry">`;
+            html += `<div class="client-name">Client: ${client.client_name} <span class="exp-dates">${client.start_date} — ${client.end_date}</span></div>`;
+            html += `<div class="exp-title">${client.title || ""}</div>`;
+            for (const bullet of client.bullets || []) {
+              html += renderBullet(bullet, scoringMap);
+            }
+            html += `</div>`;
+          }
+        } else {
+          html += `<div class="exp-title">${exp.title || ""} &middot; ${exp.location || ""}</div>`;
+          for (const bullet of exp.bullets || []) {
+            html += renderBullet(bullet, scoringMap);
+          }
+        }
+
+        html += `</div>`;
+        expEl.innerHTML += html;
+      }
+
+      // Staggered reveal animation
+      document.getElementById("results").style.display = "block";
+      const sections = document.querySelectorAll("#results .section");
+      sections.forEach((section, i) => {
+        section.classList.remove("reveal");
+        section.style.opacity = "0";
+        setTimeout(() => {
+          section.style.opacity = "";
+          section.classList.add("reveal");
+        }, i * 150);
+      });
+    }
+
+    function renderBullet(text, scoringMap) {
+      const scoreData = scoringMap[text];
+      let scoreClass = "score-needs";
+      let scoreVal = "?";
+      if (scoreData) {
+        scoreVal = scoreData.score;
+        if (scoreData.grade === "Excellent") scoreClass = "score-excellent";
+        else if (scoreData.grade === "Good") scoreClass = "score-good";
+        else if (scoreData.grade === "Rewrite required") scoreClass = "score-rewrite";
+      }
+      return `<div class="bullet-item"><div class="bullet-score ${scoreClass}">${scoreVal}</div><div class="bullet-text">${escapeHtml(text)}</div></div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ── Download DOCX ──
+    async function downloadDocx() {
+      if (!currentResumeData) return;
+
+      const btn = event.target;
+      btn.textContent = "Building...";
+      btn.disabled = true;
+
+      try {
+        const resp = await fetch(API_BASE + "/build", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Passphrase": currentPassphrase,
+          },
+          body: JSON.stringify({ resumeData: currentResumeData }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to build DOCX");
+        }
+
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "Resume.docx";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.textContent = "Download .docx";
+        btn.disabled = false;
+      }
+    }
+
+    // ── Start over ──
+    function startOver() {
+      document.getElementById("results").style.display = "none";
+      document.getElementById("progress").style.display = "none";
+      document.getElementById("main-form").style.display = "block";
+      currentResumeData = null;
+    }
+
+    // ── Errors ──
+    function showError(msg) {
+      const el = document.getElementById("error-box");
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("error-box").style.display = "none";
+    }
+  </script>
+</body>
+</html>

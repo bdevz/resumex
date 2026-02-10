@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #181a20;
+      --surface-2: #1e2028;
+      --surface-3: #252830;
+      --border: #2a2d38;
+      --border-focus: #4a7cff;
+      --text: #e8e9ec;
+      --text-dim: #8b8f9a;
+      --text-muted: #5a5e6a;
+      --accent: #4a7cff;
+      --accent-dim: #3a5cc0;
+      --green: #34d399;
+      --green-dim: #064e3b;
+      --amber: #fbbf24;
+      --amber-dim: #78350f;
+      --red: #f87171;
+      --red-dim: #7f1d1d;
+      --radius: 10px;
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    header {
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+
+    /* ── Auth gate ── */
+    #auth-gate {
+      margin-bottom: 32px;
+    }
+
+    .auth-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .auth-row input {
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .auth-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .auth-status.ok {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238b8f9a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 44px;
+    }
+
+    .field-group {
+      margin-bottom: 24px;
+    }
+
+    .field-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ── Buttons ── */
+    button {
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      padding: 14px 32px;
+      font-size: 16px;
+    }
+
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 12px 24px;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--surface-3); }
+
+    .btn-small {
+      padding: 6px 14px;
+      font-size: 13px;
+      background: var(--surface-2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+
+    .btn-small:hover { color: var(--text); }
+
+    /* ── Results ── */
+    #results {
+      display: none;
+      margin-top: 48px;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .results-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .meta-item {
+      padding: 12px;
+      background: var(--surface-2);
+      border-radius: 8px;
+    }
+
+    .meta-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .meta-value {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    /* ── Experience preview ── */
+    .exp-entry {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .exp-entry:last-child { border-bottom: none; }
+
+    .exp-company {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .exp-title {
+      color: var(--text-dim);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .exp-dates {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .bullet-item {
+      display: flex;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .bullet-score {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .score-excellent { background: var(--green-dim); color: var(--green); }
+    .score-good { background: rgba(74, 124, 255, 0.15); color: var(--accent); }
+    .score-needs { background: var(--amber-dim); color: var(--amber); }
+    .score-rewrite { background: var(--red-dim); color: var(--red); }
+
+    .bullet-text {
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    /* ── Score summary ── */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--surface-2);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .score-number {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .score-label {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ── Timeline warnings ── */
+    .warning-item {
+      padding: 10px 14px;
+      background: var(--amber-dim);
+      border-radius: 8px;
+      color: var(--amber);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Loading state ── */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+
+    .loading-sub {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    /* ── Error ── */
+    .error-box {
+      padding: 16px 20px;
+      background: var(--red-dim);
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      border-radius: var(--radius);
+      color: var(--red);
+      font-size: 14px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 32px 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ── Skills tags ── */
+    .skills-row {
+      margin-bottom: 10px;
+    }
+
+    .skills-category {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-right: 8px;
+    }
+
+    .skills-list {
+      font-size: 13px;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+
+    /* ── Client sub-entry ── */
+    .client-entry {
+      margin-left: 20px;
+      padding-left: 16px;
+      border-left: 2px solid var(--border);
+      margin-top: 8px;
+    }
+
+    .client-name {
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>Resume Generator</h1>
+      <p>Paste a job description, get an ATS-optimized resume with Google XYZ formula bullets</p>
+    </header>
+
+    <!-- Auth -->
+    <div id="auth-gate">
+      <div id="auth-form">
+        <label>Team passphrase</label>
+        <div class="auth-row">
+          <input type="password" id="passphrase" placeholder="Enter passphrase" autocomplete="off">
+          <button class="btn-primary" onclick="authenticate()" style="padding: 12px 24px;">Unlock</button>
+        </div>
+        <p class="field-hint">Get this from the person who set up the tool</p>
+      </div>
+      <div id="auth-ok" class="auth-status ok" style="display:none;">
+        Unlocked
+        <button class="btn-small" onclick="logout()">Change</button>
+      </div>
+    </div>
+
+    <!-- Main form -->
+    <div id="main-form" style="display:none;">
+      <div class="field-group">
+        <label>Job Description</label>
+        <textarea id="jd-input" placeholder="Paste the full job description here..."></textarea>
+      </div>
+
+      <div class="two-col">
+        <div class="field-group">
+          <label>Target Company</label>
+          <input type="text" id="customer-input" placeholder="e.g., Netflix, JPMorgan Chase">
+          <p class="field-hint">Helps pick competitor companies for work history</p>
+        </div>
+        <div class="field-group">
+          <label>Model</label>
+          <select id="model-select">
+            <option value="claude-sonnet">Claude Sonnet (recommended)</option>
+            <option value="claude-haiku">Claude Haiku (faster, cheaper)</option>
+            <option value="claude-opus">Claude Opus (most capable)</option>
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="gpt-4.1">GPT-4.1</option>
+            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+            <option value="gemini-2-flash">Gemini 2 Flash</option>
+            <option value="gemini-2-pro">Gemini 2 Pro</option>
+            <option value="deepseek-v3">DeepSeek V3</option>
+            <option value="deepseek-r1">DeepSeek R1</option>
+            <option value="llama-3.3-70b">Llama 3.3 70B</option>
+            <option value="mistral-large">Mistral Large</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Extra context <span style="color:var(--text-muted);text-transform:none;font-weight:400;">(optional)</span></label>
+        <input type="text" id="context-input" placeholder='e.g., "focus on backend", "heavy on Kubernetes", "Azure preferred"'>
+      </div>
+
+      <button class="btn-primary" id="generate-btn" onclick="generate()">
+        Generate Resume
+      </button>
+
+      <div class="error-box" id="error-box"></div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">Generating your resume...</div>
+      <div class="loading-sub">Analyzing JD, building work history, scoring bullets (15-30 seconds)</div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="results-header">
+        <h2>Generated Resume</h2>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+          <button class="btn-secondary" onclick="startOver()">Start Over</button>
+        </div>
+      </div>
+
+      <!-- Meta -->
+      <div class="section">
+        <div class="section-title">Detected from JD</div>
+        <div class="meta-grid" id="meta-grid"></div>
+      </div>
+
+      <!-- Score -->
+      <div class="section">
+        <div class="section-title">Bullet Quality</div>
+        <div class="score-bar">
+          <div class="score-number" id="avg-score">—</div>
+          <div>
+            <div style="font-weight:600;">Average Score</div>
+            <div class="score-label" id="score-count">across 0 bullets (out of 7)</div>
+          </div>
+        </div>
+        <div id="timeline-warnings"></div>
+      </div>
+
+      <!-- Professional Summary -->
+      <div class="section">
+        <div class="section-title">Professional Summary</div>
+        <p id="summary-text" style="font-size:14px;line-height:1.7;"></p>
+      </div>
+
+      <!-- Skills -->
+      <div class="section">
+        <div class="section-title">Technical Skills</div>
+        <div id="skills-container"></div>
+      </div>
+
+      <!-- Experience -->
+      <div class="section">
+        <div class="section-title">Experience</div>
+        <div id="experience-container"></div>
+      </div>
+
+      <!-- Download again -->
+      <div style="text-align:center;margin-top:24px;">
+        <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      Resumes generated with fictional work history. Replace name, contact info, and verify details before sending.
+    </div>
+  </div>
+
+  <script>
+    // ── State ──
+    let currentResumeData = null;
+    let currentPassphrase = null;
+
+    // ── API base — set this to your Lambda Function URL ──
+    // After deploying, replace this with your actual URL like:
+    //   https://abc123xyz.lambda-url.us-east-1.on.aws
+    // The deploy script will do this automatically.
+    const API_BASE = "%%LAMBDA_URL%%";
+
+    // ── Auth ──
+    function authenticate() {
+      const pp = document.getElementById("passphrase").value.trim();
+      if (!pp) return;
+      currentPassphrase = pp;
+      // Save to sessionStorage so it survives page reload within the session
+      try { sessionStorage.setItem("rg_pp", pp); } catch(e) {}
+      showAuthenticated();
+    }
+
+    function showAuthenticated() {
+      document.getElementById("auth-form").style.display = "none";
+      document.getElementById("auth-ok").style.display = "inline-flex";
+      document.getElementById("main-form").style.display = "block";
+    }
+
+    function logout() {
+      currentPassphrase = null;
+      try { sessionStorage.removeItem("rg_pp"); } catch(e) {}
+      document.getElementById("auth-form").style.display = "block";
+      document.getElementById("auth-ok").style.display = "none";
+      document.getElementById("main-form").style.display = "none";
+      document.getElementById("results").style.display = "none";
+      document.getElementById("passphrase").value = "";
+    }
+
+    // Check for saved passphrase on load
+    try {
+      const saved = sessionStorage.getItem("rg_pp");
+      if (saved) {
+        currentPassphrase = saved;
+        showAuthenticated();
+      }
+    } catch(e) {}
+
+    // Also support Enter key on passphrase input
+    document.getElementById("passphrase").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") authenticate();
+    });
+
+    // ── Generate ──
+    async function generate() {
+      const jd = document.getElementById("jd-input").value.trim();
+      const customer = document.getElementById("customer-input").value.trim();
+      const model = document.getElementById("model-select").value;
+      const context = document.getElementById("context-input").value.trim();
+
+      if (!jd || jd.length < 50) {
+        showError("Please paste a job description (at least 50 characters).");
+        return;
+      }
+
+      hideError();
+      document.getElementById("main-form").style.display = "none";
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("results").style.display = "none";
+
+      try {
+        const resp = await fetch(API_BASE + "/analyze", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Passphrase": currentPassphrase,
+          },
+          body: JSON.stringify({
+            jd,
+            customer: customer || undefined,
+            model,
+            context: context || undefined,
+          }),
+        });
+
+        if (resp.status === 401) {
+          throw new Error("Invalid passphrase. Check with the person who set up the tool.");
+        }
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || data.details || `Server error (${resp.status})`);
+        }
+
+        currentResumeData = data.resumeData;
+        renderResults(data);
+
+      } catch (err) {
+        showError(err.message);
+        document.getElementById("main-form").style.display = "block";
+      } finally {
+        document.getElementById("loading").style.display = "none";
+      }
+    }
+
+    // ── Render results ──
+    function renderResults(data) {
+      const { resumeData, scoring, timeline_warnings, model_used, usage } = data;
+
+      // Meta
+      const pjd = resumeData.parsed_jd || {};
+      const metaGrid = document.getElementById("meta-grid");
+      metaGrid.innerHTML = "";
+      const metaItems = [
+        ["Role", pjd.role_title || "—"],
+        ["Industry", pjd.industry || "—"],
+        ["Cloud", (pjd.cloud_platform || "—").toUpperCase()],
+        ["Model", model_used || "—"],
+      ];
+      if (usage) {
+        const cost = ((usage.prompt_tokens || 0) * 0.000003 + (usage.completion_tokens || 0) * 0.000015).toFixed(3);
+        metaItems.push(["Tokens", `${usage.prompt_tokens || "?"}/${usage.completion_tokens || "?"}`]);
+        metaItems.push(["Est. Cost", `$${cost}`]);
+      }
+      for (const [label, value] of metaItems) {
+        metaGrid.innerHTML += `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
+      }
+
+      // Score
+      document.getElementById("avg-score").textContent = scoring.average;
+      document.getElementById("score-count").textContent = `across ${scoring.bulletCount} bullets (out of 7)`;
+
+      // Timeline warnings
+      const warningsEl = document.getElementById("timeline-warnings");
+      warningsEl.innerHTML = "";
+      if (timeline_warnings.length > 0) {
+        for (const w of timeline_warnings) {
+          warningsEl.innerHTML += `<div class="warning-item">${w}</div>`;
+        }
+      }
+
+      // Summary
+      document.getElementById("summary-text").textContent = resumeData.professional_summary || "";
+
+      // Skills
+      const skillsEl = document.getElementById("skills-container");
+      skillsEl.innerHTML = "";
+      if (resumeData.technical_skills) {
+        for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
+          skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${cat}:</span><span class="skills-list">${skills}</span></div>`;
+        }
+      }
+
+      // Experience
+      const expEl = document.getElementById("experience-container");
+      expEl.innerHTML = "";
+
+      // Build scoring lookup
+      const scoringMap = {};
+      if (scoring.results) {
+        for (const company of scoring.results) {
+          for (const b of company.bullets) {
+            scoringMap[b.text] = b;
+          }
+        }
+      }
+
+      for (const exp of resumeData.experience) {
+        let html = `<div class="exp-entry">`;
+        html += `<div class="exp-company">${exp.company} <span class="exp-dates">${exp.start_date} — ${exp.end_date}</span></div>`;
+
+        if (exp.is_consulting && exp.clients) {
+          html += `<div class="exp-title">${exp.title || "Software Engineer"} &middot; ${exp.location || ""}</div>`;
+          for (const client of exp.clients) {
+            html += `<div class="client-entry">`;
+            html += `<div class="client-name">Client: ${client.client_name} <span class="exp-dates">${client.start_date} — ${client.end_date}</span></div>`;
+            html += `<div class="exp-title">${client.title || ""}</div>`;
+            for (const bullet of client.bullets || []) {
+              html += renderBullet(bullet, scoringMap);
+            }
+            html += `</div>`;
+          }
+        } else {
+          html += `<div class="exp-title">${exp.title || ""} &middot; ${exp.location || ""}</div>`;
+          for (const bullet of exp.bullets || []) {
+            html += renderBullet(bullet, scoringMap);
+          }
+        }
+
+        html += `</div>`;
+        expEl.innerHTML += html;
+      }
+
+      document.getElementById("results").style.display = "block";
+    }
+
+    function renderBullet(text, scoringMap) {
+      const scoreData = scoringMap[text];
+      let scoreClass = "score-needs";
+      let scoreVal = "?";
+      if (scoreData) {
+        scoreVal = scoreData.score;
+        if (scoreData.grade === "Excellent") scoreClass = "score-excellent";
+        else if (scoreData.grade === "Good") scoreClass = "score-good";
+        else if (scoreData.grade === "Rewrite required") scoreClass = "score-rewrite";
+      }
+      return `<div class="bullet-item"><div class="bullet-score ${scoreClass}">${scoreVal}</div><div class="bullet-text">${escapeHtml(text)}</div></div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ── Download DOCX ──
+    async function downloadDocx() {
+      if (!currentResumeData) return;
+
+      const btn = event.target;
+      btn.textContent = "Building...";
+      btn.disabled = true;
+
+      try {
+        const resp = await fetch(API_BASE + "/build", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Passphrase": currentPassphrase,
+          },
+          body: JSON.stringify({ resumeData: currentResumeData }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to build DOCX");
+        }
+
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "Resume.docx";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.textContent = "Download .docx";
+        btn.disabled = false;
+      }
+    }
+
+    // ── Start over ──
+    function startOver() {
+      document.getElementById("results").style.display = "none";
+      document.getElementById("main-form").style.display = "block";
+      currentResumeData = null;
+    }
+
+    // ── Errors ──
+    function showError(msg) {
+      const el = document.getElementById("error-box");
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("error-box").style.display = "none";
+    }
+  </script>
+</body>
+</html>

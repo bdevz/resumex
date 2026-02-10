@@ -1,0 +1,25 @@
+# AWS Deployment Template Configuration
+# Generated on 2026-02-09T18:44:25.702Z
+
+application:
+  name: test-app
+  type: frontend
+  version: 1.0.0
+
+aws:
+  region: us-east-1
+  # profile: default  # Uncomment to use a specific AWS profile
+
+frontend:
+  source_dir: ./dist
+  index_file: index.html
+  build_command: npm run build
+  # custom_domain: example.com  # Uncomment to use a custom domain
+
+deployment:
+  stack_name: test-app-stack
+  enable_monitoring: true
+  tags:
+    Environment: production
+    Project: test-app
+    # Add your custom tags here

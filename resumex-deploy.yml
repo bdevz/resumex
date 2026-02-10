@@ -1,0 +1,36 @@
+# AWS Deployment Template Configuration for ResumeX
+# Resume Generator - Full-stack application with Lambda backend and S3 frontend
+
+application:
+  name: resumex
+  type: fullstack
+  version: 1.0.0
+
+aws:
+  region: us-east-1
+  # profile: default  # Uncomment to use a specific AWS profile
+
+frontend:
+  source_dir: ./frontend
+  index_file: index.html
+  # The frontend is a single HTML file with embedded CSS/JS
+
+backend:
+  source_dir: ./lambda
+  handler: index.handler
+  runtime: nodejs18.x
+  timeout: 60
+  memory: 512
+  environment_variables:
+    NODE_ENV: production
+    # OPENROUTER_API_KEY: "your-openrouter-api-key-here"  # Set this during deployment
+    # SHARED_PASSPHRASE: "your-team-passphrase-here"      # Set this during deployment
+
+deployment:
+  stack_name: resumex-stack
+  enable_monitoring: true
+  tags:
+    Environment: production
+    Project: ResumeX
+    Application: resume-generator
+    ManagedBy: AWS-Deployment-Template

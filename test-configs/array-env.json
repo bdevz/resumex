@@ -1,0 +1,1 @@
+{"application":{"name":"array-env-app","type":"frontend"},"frontend":{"source_dir":"./dist","build_command":"npm run build -- --env=${BUILD_ENV:-production}"},"deployment":{"tags":{"BuildEnv":"${TEST_ARRAY_VAR}","Version":"${VERSION:-1.0.0}","StaticValue":"static-value"}}}
