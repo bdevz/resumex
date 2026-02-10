@@ -477,17 +477,17 @@
 
     .template-preview {
       width: 100%;
-      aspect-ratio: 8.5 / 11;
-      max-height: 140px;
       border-radius: 4px;
       overflow: hidden;
       margin-bottom: 8px;
       border: 1px solid var(--border);
+      background: #fff;
     }
 
-    .template-preview svg {
+    .template-preview img {
       width: 100%;
-      height: 100%;
+      height: auto;
+      display: block;
     }
 
     .template-name {
@@ -709,203 +709,20 @@
     let currentPassphrase = null;
     let selectedTemplate = "classic";
 
-    // ── Template Options with SVG previews ──
-    // SVG mini-previews: white page background, colored lines/blocks representing resume sections
-    // Single-column: name centered, section headers, text lines, bullets
-    // Two-column: sidebar block + main content area
-
-    function singleColSVG(accent, headerFont) {
-      // accent = section header color, headerFont = "serif" or "sans"
-      var a = accent || "333";
-      var nameBar = a === "000" ? "333" : a; // avoid invisible name on white
-      return '<svg viewBox="0 0 85 110" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="85" height="110" fill="#fff"/>' +
-        // Name
-        '<rect x="22" y="6" width="41" height="4" rx="1" fill="#' + nameBar + '"/>' +
-        // Contact line
-        '<rect x="16" y="12" width="53" height="1.5" rx=".5" fill="#bbb"/>' +
-        // Section: Summary
-        '<rect x="6" y="19" width="28" height="2.5" rx=".5" fill="#' + a + '"/>' +
-        (headerFont === "serif" ? '<rect x="6" y="22" width="73" height=".5" fill="#' + a + '"/>' : '') +
-        '<rect x="6" y="24" width="73" height="1.5" rx=".5" fill="#ccc"/>' +
-        '<rect x="6" y="27" width="65" height="1.5" rx=".5" fill="#ccc"/>' +
-        // Section: Skills
-        '<rect x="6" y="33" width="22" height="2.5" rx=".5" fill="#' + a + '"/>' +
-        (headerFont === "serif" ? '<rect x="6" y="36" width="73" height=".5" fill="#' + a + '"/>' : '') +
-        '<rect x="6" y="38" width="70" height="1.5" rx=".5" fill="#ddd"/>' +
-        '<rect x="6" y="41" width="68" height="1.5" rx=".5" fill="#ddd"/>' +
-        '<rect x="6" y="44" width="60" height="1.5" rx=".5" fill="#ddd"/>' +
-        // Section: Experience
-        '<rect x="6" y="50" width="30" height="2.5" rx=".5" fill="#' + a + '"/>' +
-        (headerFont === "serif" ? '<rect x="6" y="53" width="73" height=".5" fill="#' + a + '"/>' : '') +
-        // Role 1
-        '<rect x="6" y="55" width="32" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="55" y="55" width="24" height="1.5" rx=".5" fill="#bbb"/>' +
-        '<rect x="6" y="58.5" width="28" height="1.5" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="10" y="62" width="65" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="10" y="64.5" width="63" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="10" y="67" width="60" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="10" y="69.5" width="64" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Role 2
-        '<rect x="6" y="74" width="30" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="55" y="74" width="24" height="1.5" rx=".5" fill="#bbb"/>' +
-        '<rect x="6" y="77.5" width="26" height="1.5" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="10" y="81" width="63" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="10" y="83.5" width="60" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="10" y="86" width="65" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Education
-        '<rect x="6" y="92" width="20" height="2.5" rx=".5" fill="#' + a + '"/>' +
-        (headerFont === "serif" ? '<rect x="6" y="95" width="73" height=".5" fill="#' + a + '"/>' : '') +
-        '<rect x="6" y="97" width="40" height="1.5" rx=".5" fill="#555"/>' +
-        '<rect x="6" y="100" width="35" height="1.5" rx=".5" fill="#999" opacity=".6"/>' +
-        '</svg>';
-    }
-
-    function twoColSVG(sidebarColor, accentColor, sidebarPos) {
-      var sc = sidebarColor || "1B2A4A";
-      var ac = accentColor || "2B579A";
-      var isDark = isDarkHex(sc);
-      var textOnSidebar = isDark ? "#fff" : "#333";
-      var dimOnSidebar = isDark ? "rgba(255,255,255,.45)" : "#999";
-      var left = sidebarPos !== "right";
-      var sx = left ? 0 : 55;      // sidebar x
-      var mx = left ? 32 : 0;      // main x
-      var sw = 30;                  // sidebar width
-      var mw = 53;                  // main content width
-
-      return '<svg viewBox="0 0 85 110" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="85" height="110" fill="#fff"/>' +
-        // Sidebar background
-        '<rect x="' + sx + '" y="0" width="' + sw + '" height="110" fill="#' + sc + '"/>' +
-        // Sidebar: Name
-        '<rect x="' + (sx+4) + '" y="8" width="22" height="3" rx=".5" fill="' + textOnSidebar + '"/>' +
-        // Sidebar: Contact lines
-        '<rect x="' + (sx+4) + '" y="14" width="20" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="17" width="18" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="20" width="21" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        // Sidebar: Skills header
-        '<rect x="' + (sx+4) + '" y="27" width="16" height="2" rx=".5" fill="' + textOnSidebar + '"/>' +
-        // Sidebar: Skill lines
-        '<rect x="' + (sx+4) + '" y="31" width="20" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="34" width="18" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="37" width="21" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="40" width="17" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="43" width="20" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="46" width="19" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        // Sidebar: Education header
-        '<rect x="' + (sx+4) + '" y="53" width="18" height="2" rx=".5" fill="' + textOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="57" width="21" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        '<rect x="' + (sx+4) + '" y="60" width="18" height="1.2" rx=".5" fill="' + dimOnSidebar + '"/>' +
-        // Main: Summary header
-        '<rect x="' + (mx+4) + '" y="8" width="24" height="2.5" rx=".5" fill="#' + ac + '"/>' +
-        '<rect x="' + (mx+4) + '" y="13" width="45" height="1.5" rx=".5" fill="#ccc"/>' +
-        '<rect x="' + (mx+4) + '" y="16" width="40" height="1.5" rx=".5" fill="#ccc"/>' +
-        // Main: Experience header
-        '<rect x="' + (mx+4) + '" y="23" width="26" height="2.5" rx=".5" fill="#' + ac + '"/>' +
-        // Role 1
-        '<rect x="' + (mx+4) + '" y="28" width="24" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="' + (mx+35) + '" y="28" width="14" height="1.5" rx=".5" fill="#bbb"/>' +
-        '<rect x="' + (mx+4) + '" y="31.5" width="20" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="' + (mx+7) + '" y="35" width="40" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="37.5" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="40" width="42" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="42.5" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="45" width="40" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Role 2
-        '<rect x="' + (mx+4) + '" y="50" width="22" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="' + (mx+35) + '" y="50" width="14" height="1.5" rx=".5" fill="#bbb"/>' +
-        '<rect x="' + (mx+4) + '" y="53.5" width="18" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="' + (mx+7) + '" y="57" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="59.5" width="42" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="62" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="64.5" width="40" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="67" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Role 3
-        '<rect x="' + (mx+4) + '" y="72" width="20" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="' + (mx+35) + '" y="72" width="14" height="1.5" rx=".5" fill="#bbb"/>' +
-        '<rect x="' + (mx+4) + '" y="75.5" width="16" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="' + (mx+7) + '" y="79" width="40" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="81.5" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="84" width="42" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="' + (mx+7) + '" y="86.5" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '</svg>';
-    }
-
-    // Timeline variant: sidebar + left border on experience
-    function timelineSVG() {
-      var sc = "1A7A7A";
-      var sx = 0; var mx = 32;
-      return '<svg viewBox="0 0 85 110" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="85" height="110" fill="#fff"/>' +
-        '<rect x="0" y="0" width="30" height="110" fill="#' + sc + '"/>' +
-        // Sidebar content
-        '<rect x="4" y="8" width="22" height="3" rx=".5" fill="#fff"/>' +
-        '<rect x="4" y="14" width="20" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="17" width="18" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="20" width="21" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="27" width="16" height="2" rx=".5" fill="#fff"/>' +
-        '<rect x="4" y="31" width="20" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="34" width="18" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="37" width="21" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        '<rect x="4" y="40" width="17" height="1.2" rx=".5" fill="rgba(255,255,255,.45)"/>' +
-        // Main: Experience header
-        '<rect x="36" y="8" width="26" height="2.5" rx=".5" fill="#' + sc + '"/>' +
-        // Timeline line
-        '<rect x="35" y="14" width="1.5" height="80" fill="#' + sc + '" opacity=".3"/>' +
-        // Role 1 - dot + content
-        '<circle cx="35.75" cy="16" r="2" fill="#' + sc + '"/>' +
-        '<rect x="40" y="14.5" width="24" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="40" y="18" width="18" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="42" y="21" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="23.5" width="34" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="26" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="28.5" width="32" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Role 2
-        '<circle cx="35.75" cy="35" r="2" fill="#' + sc + '"/>' +
-        '<rect x="40" y="33.5" width="22" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="40" y="37" width="16" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="42" y="40" width="34" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="42.5" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="45" width="32" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="47.5" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        // Role 3
-        '<circle cx="35.75" cy="54" r="2" fill="#' + sc + '"/>' +
-        '<rect x="40" y="52.5" width="20" height="2" rx=".5" fill="#555"/>' +
-        '<rect x="40" y="56" width="14" height="1.2" rx=".5" fill="#999" opacity=".6"/>' +
-        '<rect x="42" y="59" width="36" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="61.5" width="32" height="1.2" rx=".5" fill="#ddd"/>' +
-        '<rect x="42" y="64" width="38" height="1.2" rx=".5" fill="#ddd"/>' +
-        '</svg>';
-    }
-
-    function isDarkHex(hex) {
-      if (!hex) return false;
-      var r = parseInt(hex.substr(0, 2), 16);
-      var g = parseInt(hex.substr(2, 2), 16);
-      var b = parseInt(hex.substr(4, 2), 16);
-      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
-    }
+    // ── Template Options with image previews ──
 
     const TEMPLATE_OPTIONS = [
-      { id: "classic",        name: "Classic",        ats: true,  type: "Single column",
-        preview: function() { return singleColSVG("000", "sans"); } },
-      { id: "elegant",        name: "Elegant",        ats: true,  type: "Single column",
-        preview: function() { return singleColSVG("1A7A7A", "serif"); } },
-      { id: "single-column",  name: "Single Column",  ats: true,  type: "Single column",
-        preview: function() { return singleColSVG("2B579A", "serif"); } },
-      { id: "ivy-league",     name: "Ivy League",     ats: true,  type: "Single column",
-        preview: function() { return singleColSVG("000", "serif"); } },
-      { id: "modern",         name: "Modern",         ats: false, type: "Two column",
-        preview: function() { return twoColSVG("F0F4F8", "2B579A", "left"); } },
-      { id: "timeline",       name: "Timeline",       ats: false, type: "Two column",
-        preview: function() { return timelineSVG(); } },
-      { id: "polished",       name: "Polished",       ats: false, type: "Two column",
-        preview: function() { return twoColSVG("1B2A4A", "1B2A4A", "right"); } },
-      { id: "creative",       name: "Creative",       ats: false, type: "Two column",
-        preview: function() { return twoColSVG("1B2A4A", "2B579A", "left"); } },
-      { id: "stylish",        name: "Stylish",        ats: false, type: "Two column",
-        preview: function() { return twoColSVG("2D2D2D", "4A90D9", "left"); } },
+      { id: "classic",        name: "Classic",        ats: true,  type: "Single column" },
+      { id: "elegant",        name: "Elegant",        ats: true,  type: "Single column" },
+      { id: "single-column",  name: "Single Column",  ats: true,  type: "Single column" },
+      { id: "ivy-league",     name: "Ivy League",     ats: true,  type: "Single column" },
+      { id: "modern",         name: "Modern",         ats: false, type: "Two column" },
+      { id: "timeline",       name: "Timeline",       ats: false, type: "Two column" },
+      { id: "polished",       name: "Polished",       ats: false, type: "Two column" },
+      { id: "creative",       name: "Creative",       ats: false, type: "Two column" },
+      { id: "stylish",        name: "Stylish",        ats: false, type: "Two column" },
     ];
+
 
     function renderTemplateGrid() {
       var grid = document.getElementById("template-grid");
@@ -917,7 +734,7 @@
         card.setAttribute("data-id", t.id);
         card.onclick = (function(id) { return function() { selectTemplate(id); }; })(t.id);
         card.innerHTML =
-          '<div class="template-preview">' + t.preview() + '</div>' +
+          '<div class="template-preview"><img src="templates/' + t.id + '.jpg" alt="' + t.name + ' template"></div>' +
           '<div class="template-name">' + t.name + '</div>' +
           '<div class="template-meta">' +
             '<span class="template-type">' + t.type + '</span>' +
