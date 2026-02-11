@@ -17,7 +17,7 @@
 
 const API = {
   // Default model — change this when new models drop
-  default_model: "anthropic/claude-sonnet-4.5",
+  default_model: "google/gemini-3-pro-preview",
 
   // All available models on OpenRouter (update this list as new models release)
   // Format: "provider/model-name" — this is how OpenRouter identifies models
@@ -33,8 +33,9 @@ const API = {
     "gpt-4.1-mini":      "openai/gpt-4.1-mini",
     "o3-mini":           "openai/o3-mini",
     // Google
+    "gemini-3-pro":      "google/gemini-3-pro-preview",
+    "gemini-2.5-pro":    "google/gemini-2.5-pro",
     "gemini-2-flash":    "google/gemini-2.0-flash-001",
-    "gemini-2-pro":      "google/gemini-2.0-pro-exp-02-05",
     // DeepSeek
     "deepseek-v3":       "deepseek/deepseek-chat",
     "deepseek-r1":       "deepseek/deepseek-reasoner",

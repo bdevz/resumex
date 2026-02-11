@@ -607,6 +607,39 @@
       font-weight: 500;
       color: var(--text);
     }
+
+    /* ── Mode Toggle ── */
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 12px 16px;
+      background: transparent;
+      color: var(--text-dim);
+      border: none;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .mode-btn:not(.active):hover {
+      background: var(--surface-2);
+    }
   </style>
 </head>
 <body>
@@ -635,6 +668,17 @@
 
     <!-- Main form -->
     <div id="main-form" style="display:none;">
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-generate" onclick="setMode('generate')">Generate New</button>
+        <button class="mode-btn" id="mode-optimize" onclick="setMode('optimize')">Optimize Existing</button>
+      </div>
+
+      <div class="field-group" id="resume-field" style="display:none;">
+        <label>Your Resume</label>
+        <textarea id="resume-input" placeholder="Paste your existing resume text here..." style="min-height:200px;"></textarea>
+        <p class="field-hint">Paste the full text of your current resume. Your real companies, titles, and dates will be preserved.</p>
+      </div>
+
       <div class="field-group">
         <label>Job Description</label>
         <textarea id="jd-input" placeholder="Paste the full job description here..."></textarea>
@@ -649,15 +693,15 @@
         <div class="field-group">
           <label>Model</label>
           <select id="model-select">
-            <option value="claude-sonnet">Claude Sonnet (recommended)</option>
-            <option value="claude-haiku">Claude Haiku (faster, cheaper)</option>
-            <option value="claude-opus">Claude Opus (most capable)</option>
+            <option value="gemini-3-pro">Gemini 3 Pro (recommended)</option>
+            <option value="claude-sonnet">Claude Sonnet</option>
+            <option value="claude-opus">Claude Opus</option>
             <option value="gpt-4o">GPT-4o</option>
-            <option value="gpt-4o-mini">GPT-4o Mini</option>
             <option value="gpt-4.1">GPT-4.1</option>
-            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
             <option value="gemini-2-flash">Gemini 2 Flash</option>
-            <option value="gemini-2-pro">Gemini 2 Pro</option>
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
             <option value="deepseek-v3">DeepSeek V3</option>
             <option value="deepseek-r1">DeepSeek R1</option>
             <option value="llama-3.3-70b">Llama 3.3 70B</option>
@@ -765,6 +809,15 @@
     let currentResumeData = null;
     let currentPassphrase = null;
     let selectedTemplate = "classic";
+    let currentMode = "generate"; // "generate" or "optimize"
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById("mode-generate").className = "mode-btn" + (mode === "generate" ? " active" : "");
+      document.getElementById("mode-optimize").className = "mode-btn" + (mode === "optimize" ? " active" : "");
+      document.getElementById("resume-field").style.display = mode === "optimize" ? "block" : "none";
+      document.getElementById("generate-btn").textContent = mode === "optimize" ? "Optimize Resume" : "Generate Resume";
+    }
 
     // ── Template Options with image previews ──
 
@@ -810,10 +863,7 @@
       document.getElementById("ats-warning").style.display = tmpl && !tmpl.ats ? "block" : "none";
     }
 
-    // ── API URLs ──
-    // STREAM_BASE: CloudFront proxies /api/* to the streaming Lambda (no 30s timeout)
-    // API_BASE: API Gateway for fast endpoints (build, models)
-    const STREAM_BASE = "";  // relative — same CloudFront origin
+    // ── API URL ──
     const API_BASE = "%%LAMBDA_URL%%";
 
     // ── Auth ──
@@ -879,12 +929,19 @@
       });
     }
 
-    // ── Generate (SSE streaming via CloudFront) ──
+    // ── Generate (API Gateway + auto-retry on 503) ──
     async function generate() {
       const jd = document.getElementById("jd-input").value.trim();
       const customer = document.getElementById("customer-input").value.trim();
       const model = document.getElementById("model-select").value;
       const context = document.getElementById("context-input").value.trim();
+      const resume = document.getElementById("resume-input").value.trim();
+      const isOptimize = currentMode === "optimize";
+
+      if (isOptimize && (!resume || resume.length < 100)) {
+        showError("Please paste your resume (at least 100 characters).");
+        return;
+      }
 
       if (!jd || jd.length < 50) {
         showError("Please paste a job description (at least 50 characters).");
@@ -896,27 +953,51 @@
       document.getElementById("main-form").style.display = "none";
       document.getElementById("loading").style.display = "block";
       document.getElementById("results").style.display = "none";
-      document.getElementById("loading-text").textContent = "Generating your resume...";
+      document.getElementById("loading-text").textContent = isOptimize ? "Optimizing your resume..." : "Generating your resume...";
 
       setStep("step-analyze", "active");
 
-      try {
-        const resp = await fetch(STREAM_BASE + "/api/analyze", {
+      var endpoint = isOptimize ? "/optimize" : "/analyze";
+      var payload = isOptimize
+        ? { resume: resume, jd: jd, model: model, context: context || undefined }
+        : { jd: jd, customer: customer || undefined, model: model, context: context || undefined };
+
+      // Simulated progress steps on timers (LLM calls take 15-90s)
+      var stepTimers = [];
+      stepTimers.push(setTimeout(function() {
+        setStep("step-analyze", "done");
+        setStep("step-connect", "active");
+        document.getElementById("loading-text").textContent = "Connecting to AI model...";
+      }, 3000));
+      stepTimers.push(setTimeout(function() {
+        setStep("step-connect", "done");
+        setStep("step-write", "active");
+        document.getElementById("loading-text").textContent = "AI is writing your resume...";
+      }, 8000));
+      stepTimers.push(setTimeout(function() {
+        setStep("step-write", "done");
+        setStep("step-score", "active");
+        document.getElementById("loading-text").textContent = "Scoring and validating...";
+      }, 40000));
+
+      async function doFetch(attempt) {
+        var resp = await fetch(API_BASE + endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Passphrase": currentPassphrase,
           },
-          body: JSON.stringify({
-            jd,
-            customer: customer || undefined,
-            model,
-            context: context || undefined,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (resp.status === 401) {
           throw new Error("Invalid passphrase. Check with the person who set up the tool.");
+        }
+
+        // Auto-retry once on 503 (API Gateway 30s timeout — LLM may still be processing)
+        if (resp.status === 503 && attempt < 2) {
+          document.getElementById("loading-text").textContent = "Still working... retrying (attempt " + (attempt + 1) + ")";
+          return doFetch(attempt + 1);
         }
 
         if (!resp.ok) {
@@ -925,76 +1006,29 @@
           throw new Error(errBody || "Server error (" + resp.status + ")");
         }
 
-        setStep("step-analyze", "done");
-        setStep("step-connect", "active");
+        return resp.json();
+      }
 
-        // Read SSE stream
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let finalData = null;
-        let gotContent = false;
+      try {
+        var data = await doFetch(1);
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop();
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (raw === "[DONE]") continue;
-
-            try {
-              const evt = JSON.parse(raw);
-
-              if (evt.type === "status") {
-                if (evt.message && evt.message.includes("writing")) {
-                  setStep("step-connect", "done");
-                  setStep("step-write", "active");
-                  document.getElementById("loading-text").textContent = "AI is writing your resume...";
-                } else if (evt.message && evt.message.includes("Connecting")) {
-                  setStep("step-connect", "active");
-                }
-              }
-
-              if (evt.type === "content" && !gotContent) {
-                gotContent = true;
-                setStep("step-connect", "done");
-                setStep("step-write", "active");
-                document.getElementById("loading-text").textContent = "AI is writing your resume...";
-              }
-
-              if (evt.type === "complete") {
-                setStep("step-write", "done");
-                setStep("step-score", "active");
-                document.getElementById("loading-text").textContent = "Scoring and validating...";
-                finalData = evt;
-              }
-
-              if (evt.type === "error") {
-                throw new Error(evt.error || "AI returned an error");
-              }
-            } catch (parseErr) {
-              if (parseErr.message && !parseErr.message.includes("JSON")) throw parseErr;
-            }
-          }
-        }
-
-        if (!finalData || !finalData.resumeData) {
+        if (!data || !data.resumeData) {
           throw new Error("No resume data received. Try again.");
         }
 
+        // Clear simulated timers and mark all steps done
+        stepTimers.forEach(clearTimeout);
+        setStep("step-analyze", "done");
+        setStep("step-connect", "done");
+        setStep("step-write", "done");
         setStep("step-score", "done");
         document.getElementById("loading-text").textContent = "Done!";
 
-        currentResumeData = finalData.resumeData;
-        renderResults(finalData);
+        currentResumeData = data.resumeData;
+        renderResults(data);
 
       } catch (err) {
+        stepTimers.forEach(clearTimeout);
         showError(err.message);
         document.getElementById("main-form").style.display = "block";
       } finally {
