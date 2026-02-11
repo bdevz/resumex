@@ -568,6 +568,118 @@
       font-family: var(--mono);
     }
 
+    /* ── Template Selector ── */
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 640px) {
+      .template-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .template-card {
+      padding: 10px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .template-card:hover {
+      border-color: var(--border-focus);
+    }
+
+    .template-card.selected {
+      border-color: var(--accent);
+      background: var(--surface-2);
+    }
+
+    .template-preview {
+      width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .template-preview img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .template-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .template-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .template-type {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .template-badge {
+      display: inline-block;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .badge-safe {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge-warn {
+      background: var(--amber-dim);
+      color: var(--amber);
+    }
+
+    .ats-warning {
+      padding: 10px 14px;
+      background: var(--amber-dim);
+      border-radius: 8px;
+      color: var(--amber);
+      font-size: 13px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .edu-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    .edu-toggle input {
+      width: auto;
+      accent-color: var(--accent);
+    }
+
+    .edu-toggle span {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
     /* ── Company entries ── */
     .company-entry {
       background: var(--surface-2);
@@ -704,6 +816,23 @@
         <input type="text" id="context-input" placeholder='e.g., "focus on backend", "heavy on Kubernetes", "Azure preferred"'>
       </div>
 
+      <div class="field-group">
+        <label>Resume Template</label>
+        <div class="template-grid" id="template-grid"></div>
+        <div id="ats-warning" class="ats-warning" style="display:none;">
+          This template uses a two-column layout that may not parse correctly in all ATS systems. Use single-column templates for maximum compatibility.
+        </div>
+        <label class="edu-toggle">
+          <input type="checkbox" id="xl-mode" checked>
+          <span>XL</span>
+          <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">(3 pages, 10+ bullets, keyword-heavy)</span>
+        </label>
+        <label class="edu-toggle">
+          <input type="checkbox" id="include-education" checked>
+          <span>Include education section</span>
+        </label>
+      </div>
+
       <button class="btn-primary" id="generate-btn" onclick="generate()">
         Optimize Resume
       </button>
@@ -804,6 +933,7 @@
     let currentResumeData = null;
     let currentPassphrase = null;
     let currentMode = "optimize"; // "optimize" or "generate"
+    let selectedTemplate = "classic";
 
     // ── API base ──
     const API_BASE = "%%LAMBDA_URL%%";
@@ -855,6 +985,50 @@
     document.getElementById("passphrase").addEventListener("keydown", (e) => {
       if (e.key === "Enter") authenticate();
     });
+
+    // ── Template Options ──
+    const TEMPLATE_OPTIONS = [
+      { id: "classic",        name: "Classic",        ats: true,  type: "Single column" },
+      { id: "elegant",        name: "Elegant",        ats: true,  type: "Single column" },
+      { id: "single-column",  name: "Single Column",  ats: true,  type: "Single column" },
+      { id: "ivy-league",     name: "Ivy League",     ats: true,  type: "Single column" },
+      { id: "modern",         name: "Modern",         ats: false, type: "Two column" },
+      { id: "timeline",       name: "Timeline",       ats: false, type: "Two column" },
+      { id: "polished",       name: "Polished",       ats: false, type: "Two column" },
+      { id: "creative",       name: "Creative",       ats: false, type: "Two column" },
+      { id: "stylish",        name: "Stylish",        ats: false, type: "Two column" },
+    ];
+
+    function renderTemplateGrid() {
+      var grid = document.getElementById("template-grid");
+      grid.innerHTML = "";
+      for (var i = 0; i < TEMPLATE_OPTIONS.length; i++) {
+        var t = TEMPLATE_OPTIONS[i];
+        var card = document.createElement("div");
+        card.className = "template-card" + (t.id === selectedTemplate ? " selected" : "");
+        card.setAttribute("data-id", t.id);
+        card.onclick = (function(id) { return function() { selectTemplate(id); }; })(t.id);
+        card.innerHTML =
+          '<div class="template-preview"><img src="templates/' + t.id + '.jpg" alt="' + t.name + ' template"></div>' +
+          '<div class="template-name">' + t.name + '</div>' +
+          '<div class="template-meta">' +
+            '<span class="template-type">' + t.type + '</span>' +
+            '<span class="template-badge ' + (t.ats ? 'badge-safe' : 'badge-warn') + '">' +
+              (t.ats ? 'ATS Safe' : 'ATS Warning') +
+            '</span>' +
+          '</div>';
+        grid.appendChild(card);
+      }
+    }
+
+    function selectTemplate(id) {
+      selectedTemplate = id;
+      renderTemplateGrid();
+      var tmpl = TEMPLATE_OPTIONS.find(function(t) { return t.id === id; });
+      document.getElementById("ats-warning").style.display = tmpl && !tmpl.ats ? "block" : "none";
+    }
+
+    renderTemplateGrid();
 
     // ── Mode switching ──
     function setMode(mode) {
@@ -1307,7 +1481,12 @@
             "Content-Type": "application/json",
             "X-Passphrase": currentPassphrase,
           },
-          body: JSON.stringify({ resumeData: currentResumeData }),
+          body: JSON.stringify({
+            resumeData: currentResumeData,
+            template: selectedTemplate,
+            includeEducation: document.getElementById("include-education").checked,
+            xlMode: document.getElementById("xl-mode").checked,
+          }),
         });
 
         if (!resp.ok) {
