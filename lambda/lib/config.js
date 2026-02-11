@@ -135,6 +135,20 @@ const FORMAT = {
   right_tab: 10080, // 12240 - 1080 - 1080 = 10080 DXA
 };
 
+// --- XL mode formatting (keyword-heavy, 3-page resume) ---
+const FORMAT_XL = {
+  page: {
+    margins: {
+      top: 576,       // 0.4 inch
+      bottom: 576,
+      left: 720,      // 0.5 inch
+      right: 720,
+    },
+  },
+  bullets_per_role: { min: 10, max: 15 },
+  max_pages: 3,
+};
+
 // --- ATS section headers (recognized by all major ATS) ---
 const ATS_HEADERS = {
   summary: "PROFESSIONAL SUMMARY",
@@ -305,6 +319,7 @@ module.exports = {
   IT_SERVICES_FIRMS,
   TIMELINE,
   FORMAT,
+  FORMAT_XL,
   ATS_HEADERS,
   XYZ_PATTERNS,
   ACTION_VERBS,

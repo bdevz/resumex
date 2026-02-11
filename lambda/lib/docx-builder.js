@@ -534,9 +534,15 @@ async function buildResume(resumeData, customContact = null, options = {}) {
   const {
     template: templateId = "classic",
     includeEducation = true,
+    xlMode = false,
   } = options;
 
-  const tmpl = TEMPLATES[templateId] || TEMPLATES.classic;
+  let tmpl = TEMPLATES[templateId] || TEMPLATES.classic;
+
+  // XL mode: override margins to narrow for 3-page keyword-heavy resumes
+  if (xlMode) {
+    tmpl = { ...tmpl, page: { ...tmpl.page, margins: config.FORMAT_XL.page.margins } };
+  }
   const contact = resumeData.contact || customContact || config.CONTACT;
   const education = includeEducation
     ? (resumeData.education || null)

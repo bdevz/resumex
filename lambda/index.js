@@ -11,7 +11,7 @@
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
-const { buildSystemPrompt, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { buildSystemPrompt, buildSystemPromptXL, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -101,13 +101,13 @@ function getHeaders(event) {
 // ── Route: POST /analyze ──
 
 async function handleAnalyze(body) {
-  const { jd, customer, context, model: modelInput } = body;
+  const { jd, customer, context, model: modelInput, xlMode } = body;
 
   if (!jd || jd.trim().length < 50) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
-  const systemPrompt = buildSystemPrompt();
+  const systemPrompt = xlMode ? buildSystemPromptXL() : buildSystemPrompt();
   const userMessage = buildUserMessage(jd, customer, context);
   const model = resolveModel(modelInput);
 
@@ -121,7 +121,7 @@ async function handleAnalyze(body) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: xlMode ? 8192 : 4096,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -170,7 +170,7 @@ async function handleAnalyze(body) {
 // ── Route: POST /optimize ──
 
 async function handleOptimize(body) {
-  const { resume, jd, context, model: modelInput } = body;
+  const { resume, jd, context, model: modelInput, xlMode } = body;
 
   if (!resume || resume.trim().length < 100) {
     return response(400, { error: "Resume too short (need at least 100 characters)" });
@@ -180,7 +180,7 @@ async function handleOptimize(body) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
-  const systemPrompt = buildOptimizeSystemPrompt();
+  const systemPrompt = xlMode ? buildOptimizeSystemPromptXL() : buildOptimizeSystemPrompt();
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
@@ -194,7 +194,7 @@ async function handleOptimize(body) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: xlMode ? 8192 : 4096,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -244,7 +244,7 @@ async function handleOptimize(body) {
 // ── Route: POST /build ──
 
 async function handleBuild(body) {
-  const { resumeData, template, includeEducation } = body;
+  const { resumeData, template, includeEducation, xlMode } = body;
 
   if (!resumeData || !resumeData.experience) {
     return response(400, { error: "Missing resumeData with experience array" });
@@ -253,6 +253,7 @@ async function handleBuild(body) {
   const buffer = await buildResume(resumeData, null, {
     template: template || "classic",
     includeEducation: includeEducation !== false,
+    xlMode: !!xlMode,
   });
   return binaryResponse(buffer, "Resume.docx");
 }

@@ -722,6 +722,11 @@
           This template uses a two-column layout that may not parse correctly in all ATS systems. Use single-column templates for maximum compatibility.
         </div>
         <label class="edu-toggle">
+          <input type="checkbox" id="xl-mode" checked>
+          <span>XL</span>
+          <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">(3 pages, 10+ bullets, keyword-heavy)</span>
+        </label>
+        <label class="edu-toggle">
           <input type="checkbox" id="include-education" checked>
           <span>Include education section</span>
         </label>
@@ -958,9 +963,10 @@
       setStep("step-analyze", "active");
 
       var endpoint = isOptimize ? "/optimize" : "/analyze";
+      var xlMode = document.getElementById("xl-mode").checked;
       var payload = isOptimize
-        ? { resume: resume, jd: jd, model: model, context: context || undefined }
-        : { jd: jd, customer: customer || undefined, model: model, context: context || undefined };
+        ? { resume: resume, jd: jd, model: model, context: context || undefined, xlMode: xlMode }
+        : { jd: jd, customer: customer || undefined, model: model, context: context || undefined, xlMode: xlMode };
 
       // Simulated progress steps on timers (LLM calls take 15-90s)
       var stepTimers = [];
@@ -1175,6 +1181,7 @@
             resumeData: currentResumeData,
             template: selectedTemplate,
             includeEducation: document.getElementById("include-education").checked,
+            xlMode: document.getElementById("xl-mode").checked,
           }),
         });
 
