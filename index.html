@@ -929,7 +929,7 @@
       });
     }
 
-    // ── Generate (API Gateway + auto-retry on 503) ──
+    // ── Generate (async job + polling) ──
     async function generate() {
       const jd = document.getElementById("jd-input").value.trim();
       const customer = document.getElementById("customer-input").value.trim();
@@ -968,52 +968,45 @@
         setStep("step-analyze", "done");
         setStep("step-connect", "active");
         document.getElementById("loading-text").textContent = "Connecting to AI model...";
-      }, 3000));
+      }, 2000));
       stepTimers.push(setTimeout(function() {
         setStep("step-connect", "done");
         setStep("step-write", "active");
         document.getElementById("loading-text").textContent = "AI is writing your resume...";
-      }, 8000));
+      }, 6000));
       stepTimers.push(setTimeout(function() {
         setStep("step-write", "done");
         setStep("step-score", "active");
         document.getElementById("loading-text").textContent = "Scoring and validating...";
-      }, 40000));
+      }, 35000));
 
-      async function doFetch(attempt) {
-        var resp = await fetch(API_BASE + endpoint, {
+      try {
+        // Step 1: Submit job
+        var submitResp = await fetch(API_BASE + endpoint, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Passphrase": currentPassphrase,
-          },
+          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase },
           body: JSON.stringify(payload),
         });
 
-        if (resp.status === 401) {
+        if (submitResp.status === 401) {
           throw new Error("Invalid passphrase. Check with the person who set up the tool.");
         }
-
-        // Auto-retry once on 503 (API Gateway 30s timeout — LLM may still be processing)
-        if (resp.status === 503 && attempt < 2) {
-          document.getElementById("loading-text").textContent = "Still working... retrying (attempt " + (attempt + 1) + ")";
-          return doFetch(attempt + 1);
-        }
-
-        if (!resp.ok) {
-          var errBody = await resp.text();
+        if (!submitResp.ok) {
+          var errBody = await submitResp.text();
           try { errBody = JSON.parse(errBody).error || errBody; } catch(e) {}
-          throw new Error(errBody || "Server error (" + resp.status + ")");
+          throw new Error(errBody || "Server error (" + submitResp.status + ")");
         }
 
-        return resp.json();
-      }
+        var submitData = await submitResp.json();
+        if (!submitData.jobId) {
+          throw new Error("Failed to start job. Try again.");
+        }
 
-      try {
-        var data = await doFetch(1);
+        // Step 2: Poll for results
+        var data = await pollForResult(submitData.jobId);
 
         if (!data || !data.resumeData) {
-          throw new Error("No resume data received. Try again.");
+          throw new Error(data.error || "No resume data received. Try again.");
         }
 
         // Clear simulated timers and mark all steps done
@@ -1034,6 +1027,23 @@
       } finally {
         document.getElementById("loading").style.display = "none";
       }
+    }
+
+    async function pollForResult(jobId) {
+      var maxAttempts = 60; // 60 * 3s = 3 minutes max
+      for (var i = 0; i < maxAttempts; i++) {
+        await new Promise(function(r) { setTimeout(r, 3000); });
+        var resp = await fetch(API_BASE + "/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase },
+          body: JSON.stringify({ jobId: jobId }),
+        });
+        if (!resp.ok) continue;
+        var data = await resp.json();
+        if (data.status === "complete") return data;
+        if (data.status === "error") throw new Error(data.error || "Job failed. Try again.");
+      }
+      throw new Error("Request timed out after 3 minutes. Try a faster model like Gemini 2 Flash.");
     }
 
     // ── Render results ──

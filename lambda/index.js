@@ -14,6 +14,13 @@
 const { buildSystemPrompt, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
+const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const crypto = require("crypto");
+
+const s3 = new S3Client({ region: "us-east-1" });
+const lambda = new LambdaClient({ region: "us-east-1" });
+const JOB_BUCKET = "resumex-526810258535";
 
 // ── Helpers ──
 
@@ -435,9 +442,71 @@ if (typeof awslambda !== "undefined") {
   });
 }
 
+// ── Async job helpers ──
+
+async function writeJobResult(jobId, result) {
+  await s3.send(new PutObjectCommand({
+    Bucket: JOB_BUCKET,
+    Key: `jobs/${jobId}.json`,
+    Body: JSON.stringify(result),
+    ContentType: "application/json",
+  }));
+}
+
+async function readJobResult(jobId) {
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: JOB_BUCKET,
+      Key: `jobs/${jobId}.json`,
+    }));
+    const text = await obj.Body.transformToString();
+    return JSON.parse(text);
+  } catch (err) {
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404 || err.name === "AccessDenied") return null;
+    throw err;
+  }
+}
+
+async function startAsyncJob(body, route) {
+  const jobId = crypto.randomUUID();
+  const asyncPayload = { ...body, __jobId: jobId, __route: route };
+
+  await lambda.send(new InvokeCommand({
+    FunctionName: "resume-generator",
+    InvocationType: "Event",
+    Payload: JSON.stringify({
+      __asyncJob: true,
+      body: JSON.stringify(asyncPayload),
+      headers: { "x-passphrase": process.env.SHARED_PASSPHRASE },
+    }),
+  }));
+
+  return response(202, { jobId, status: "processing" });
+}
+
 // ── Main handler (non-streaming, for API Gateway) ──
 
 exports.handler = async (event) => {
+  // ── Async job execution (invoked by Lambda async invoke) ──
+  if (event.__asyncJob) {
+    const body = JSON.parse(event.body);
+    const { __jobId: jobId, __route: route } = body;
+    try {
+      let result;
+      if (route === "optimize") {
+        result = await handleOptimize(body);
+      } else {
+        result = await handleAnalyze(body);
+      }
+      const resultBody = JSON.parse(result.body);
+      await writeJobResult(jobId, { status: "complete", ...resultBody });
+    } catch (err) {
+      console.error("Async job error:", err);
+      await writeJobResult(jobId, { status: "error", error: err.message });
+    }
+    return response(200, { ok: true });
+  }
+
   const method = getMethod(event);
   const path = getPath(event);
   const headers = getHeaders(event);
@@ -465,12 +534,22 @@ exports.handler = async (event) => {
   const body = parseBody(event);
 
   try {
+    // Poll for async job result
+    if (path === "/status" && method === "POST") {
+      const { jobId } = body;
+      if (!jobId) return response(400, { error: "Missing jobId" });
+      const result = await readJobResult(jobId);
+      if (!result) return response(200, { status: "processing" });
+      return response(200, result);
+    }
+
+    // Start async jobs for analyze/optimize (avoids 30s API GW timeout)
     if (path === "/analyze" && method === "POST") {
-      return await handleAnalyze(body);
+      return await startAsyncJob(body, "analyze");
     }
 
     if (path === "/optimize" && method === "POST") {
-      return await handleOptimize(body);
+      return await startAsyncJob(body, "optimize");
     }
 
     if (path === "/build" && method === "POST") {
