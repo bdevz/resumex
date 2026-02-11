@@ -47,6 +47,52 @@ function extractJSON(text) {
   return null;
 }
 
+// ── Short-key expansion (maps compact LLM output keys → full keys) ──
+
+const SHORT_TO_FULL = {
+  jd: "parsed_jd",
+  rt: "role_title",
+  ind: "industry",
+  cp: "cloud_platform",
+  kt: "key_technologies",
+  rs: "required_skills",
+  ps: "professional_summary",
+  ts: "technical_skills",
+  lang: "Languages",
+  fw: "Frameworks & Libraries",
+  cloud: "Cloud & DevOps",
+  db: "Databases",
+  tools: "Tools & Practices",
+  exp: "experience",
+  co: "company",
+  ti: "title",
+  loc: "location",
+  sd: "start_date",
+  ed: "end_date",
+  b: "bullets",
+  ct: "contact",
+  n: "name",
+  em: "email",
+  ph: "phone",
+  li: "linkedin",
+  gh: "github",
+  edu: "education",
+  sc: "school",
+  dg: "degree",
+};
+
+function expandKeys(obj) {
+  if (Array.isArray(obj)) return obj.map(expandKeys);
+  if (obj && typeof obj === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[SHORT_TO_FULL[k] || k] = expandKeys(v);
+    }
+    return out;
+  }
+  return obj;
+}
+
 // ── Helpers ──
 
 function response(statusCode, body, extraHeaders = {}) {
@@ -147,6 +193,7 @@ async function handleAnalyze(body) {
     body: JSON.stringify({
       model,
       max_tokens: xlMode ? 16384 : 8192,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -180,8 +227,8 @@ async function handleAnalyze(body) {
     return response(422, { error: "Model returned empty response. Try again or use a different model." });
   }
 
-  // Parse JSON
-  const resumeData = extractJSON(responseText);
+  // Parse JSON and expand short keys to full keys
+  const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
     const truncated = finishReason === "length";
     return response(422, {
@@ -232,6 +279,7 @@ async function handleOptimize(body) {
     body: JSON.stringify({
       model,
       max_tokens: xlMode ? 16384 : 8192,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -264,8 +312,8 @@ async function handleOptimize(body) {
     return response(422, { error: "Model returned empty response. Try again or use a different model." });
   }
 
-  // Parse JSON
-  const resumeData = extractJSON(responseText);
+  // Parse JSON and expand short keys to full keys
+  const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
     const truncated = finishReason === "length";
     return response(422, {
@@ -412,6 +460,7 @@ if (typeof awslambda !== "undefined") {
           model,
           max_tokens: 4096,
           stream: true,
+          response_format: { type: "json_object" },
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userMessage },
@@ -466,8 +515,8 @@ if (typeof awslambda !== "undefined") {
       }
     }
 
-    // Parse complete response and send final structured data
-    const resumeData = extractJSON(fullText);
+    // Parse complete response and expand short keys to full keys
+    const resumeData = expandKeys(extractJSON(fullText));
 
     if (resumeData) {
       const scoring = scoreResume(resumeData);

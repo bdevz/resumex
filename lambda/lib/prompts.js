@@ -16,31 +16,31 @@ CRITICAL RULES:
 6. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
 7. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
-JSON SCHEMA:
+Use these SHORT KEYS in your JSON response (saves tokens):
 {
-  "parsed_jd": {
-    "role_title": "string",
-    "industry": "string", 
-    "cloud_platform": "aws|azure|gcp",
-    "key_technologies": ["tech1", "tech2"],
-    "required_skills": ["skill1", "skill2"]
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
   },
-  "professional_summary": "2-3 sentence summary highlighting relevant experience",
-  "technical_skills": {
-    "Languages": "comma-separated list",
-    "Frameworks & Libraries": "comma-separated list", 
-    "Cloud & DevOps": "comma-separated list",
-    "Databases": "comma-separated list",
-    "Tools & Practices": "comma-separated list"
+  "ps": "2-3 sentence summary highlighting relevant experience",
+  "ts": {
+    "lang": "comma-separated list",
+    "fw": "comma-separated list",
+    "cloud": "comma-separated list",
+    "db": "comma-separated list",
+    "tools": "comma-separated list"
   },
-  "experience": [
+  "exp": [
     {
-      "company": "Company Name",
-      "title": "Job Title",
-      "location": "City, State",
-      "start_date": "MMM YYYY",
-      "end_date": "MMM YYYY",
-      "bullets": [
+      "co": "Company Name",
+      "ti": "Job Title",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY",
+      "b": [
         "XYZ formula bullet with metrics",
         "Another XYZ bullet with specific results"
       ]
@@ -114,31 +114,31 @@ Example of a 5-point bullet: "Engineered real-time data pipelines using Python a
 
 Bullets scoring below 5 are UNACCEPTABLE — rewrite until they meet the criteria.
 
-JSON SCHEMA:
+Use these SHORT KEYS in your JSON response (saves tokens):
 {
-  "parsed_jd": {
-    "role_title": "string",
-    "industry": "string",
-    "cloud_platform": "aws|azure|gcp",
-    "key_technologies": ["tech1", "tech2"],
-    "required_skills": ["skill1", "skill2"]
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
   },
-  "professional_summary": "5-8 sentence summary packed with technologies, methodologies, and domain keywords from the JD",
-  "technical_skills": {
-    "Languages": "comma-separated list",
-    "Frameworks & Libraries": "comma-separated list",
-    "Cloud & DevOps": "comma-separated list",
-    "Databases": "comma-separated list",
-    "Tools & Practices": "comma-separated list"
+  "ps": "5-8 sentence summary packed with technologies, methodologies, and domain keywords from the JD",
+  "ts": {
+    "lang": "comma-separated list",
+    "fw": "comma-separated list",
+    "cloud": "comma-separated list",
+    "db": "comma-separated list",
+    "tools": "comma-separated list"
   },
-  "experience": [
+  "exp": [
     {
-      "company": "Company Name",
-      "title": "Job Title",
-      "location": "City, State",
-      "start_date": "MMM YYYY",
-      "end_date": "MMM YYYY",
-      "bullets": [
+      "co": "Company Name",
+      "ti": "Job Title",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY",
+      "b": [
         "XYZ formula bullet with technology name AND metric",
         "Another XYZ bullet with specific framework AND percentage"
       ]
@@ -390,47 +390,47 @@ CRITICAL RULES:
 12. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
 13. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
-JSON SCHEMA:
+Use these SHORT KEYS in your JSON response (saves tokens):
 {
-  "parsed_jd": {
-    "role_title": "string",
-    "industry": "string",
-    "cloud_platform": "aws|azure|gcp",
-    "key_technologies": ["tech1", "tech2"],
-    "required_skills": ["skill1", "skill2"]
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
   },
-  "contact": {
-    "name": "extracted from resume",
-    "email": "extracted from resume",
-    "phone": "extracted from resume",
-    "linkedin": "extracted from resume or empty string",
-    "github": "extracted from resume or empty string"
+  "ct": {
+    "n": "extracted from resume",
+    "em": "extracted from resume",
+    "ph": "extracted from resume",
+    "li": "extracted from resume or empty string",
+    "gh": "extracted from resume or empty string"
   },
-  "education": [
+  "edu": [
     {
-      "school": "University Name",
-      "degree": "Degree Name",
-      "location": "City, State",
-      "start_date": "MMM YYYY",
-      "end_date": "MMM YYYY"
+      "sc": "University Name",
+      "dg": "Degree Name",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY"
     }
   ],
-  "professional_summary": "2-3 sentence summary optimized for the target role",
-  "technical_skills": {
-    "Languages": "comma-separated, prioritized by JD relevance",
-    "Frameworks & Libraries": "comma-separated",
-    "Cloud & DevOps": "comma-separated",
-    "Databases": "comma-separated",
-    "Tools & Practices": "comma-separated"
+  "ps": "2-3 sentence summary optimized for the target role",
+  "ts": {
+    "lang": "comma-separated, prioritized by JD relevance",
+    "fw": "comma-separated",
+    "cloud": "comma-separated",
+    "db": "comma-separated",
+    "tools": "comma-separated"
   },
-  "experience": [
+  "exp": [
     {
-      "company": "EXACT company name from resume",
-      "title": "EXACT title from resume",
-      "location": "City, State from resume",
-      "start_date": "MMM YYYY from resume",
-      "end_date": "MMM YYYY from resume",
-      "bullets": [
+      "co": "EXACT company name from resume",
+      "ti": "EXACT title from resume",
+      "loc": "City, State from resume",
+      "sd": "MMM YYYY from resume",
+      "ed": "MMM YYYY from resume",
+      "b": [
         "Rewritten XYZ formula bullet with metrics and JD keywords",
         "Another rewritten bullet with specific quantified results"
       ]
@@ -492,47 +492,47 @@ Example 5-point bullet: "Engineered real-time data pipelines using Python and Ap
 
 Bullets scoring below 5 are UNACCEPTABLE — rewrite until they meet the criteria.
 
-JSON SCHEMA:
+Use these SHORT KEYS in your JSON response (saves tokens):
 {
-  "parsed_jd": {
-    "role_title": "string",
-    "industry": "string",
-    "cloud_platform": "aws|azure|gcp",
-    "key_technologies": ["tech1", "tech2"],
-    "required_skills": ["skill1", "skill2"]
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
   },
-  "contact": {
-    "name": "extracted from resume",
-    "email": "extracted from resume",
-    "phone": "extracted from resume",
-    "linkedin": "extracted from resume or empty string",
-    "github": "extracted from resume or empty string"
+  "ct": {
+    "n": "extracted from resume",
+    "em": "extracted from resume",
+    "ph": "extracted from resume",
+    "li": "extracted from resume or empty string",
+    "gh": "extracted from resume or empty string"
   },
-  "education": [
+  "edu": [
     {
-      "school": "University Name",
-      "degree": "Degree Name",
-      "location": "City, State",
-      "start_date": "MMM YYYY",
-      "end_date": "MMM YYYY"
+      "sc": "University Name",
+      "dg": "Degree Name",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY"
     }
   ],
-  "professional_summary": "5-8 sentence summary packed with technologies, methodologies, and domain keywords",
-  "technical_skills": {
-    "Languages": "comma-separated, prioritized by JD relevance",
-    "Frameworks & Libraries": "comma-separated",
-    "Cloud & DevOps": "comma-separated",
-    "Databases": "comma-separated",
-    "Tools & Practices": "comma-separated"
+  "ps": "5-8 sentence summary packed with technologies, methodologies, and domain keywords",
+  "ts": {
+    "lang": "comma-separated, prioritized by JD relevance",
+    "fw": "comma-separated",
+    "cloud": "comma-separated",
+    "db": "comma-separated",
+    "tools": "comma-separated"
   },
-  "experience": [
+  "exp": [
     {
-      "company": "EXACT company name from resume",
-      "title": "EXACT title from resume",
-      "location": "City, State from resume",
-      "start_date": "MMM YYYY from resume",
-      "end_date": "MMM YYYY from resume",
-      "bullets": [
+      "co": "EXACT company name from resume",
+      "ti": "EXACT title from resume",
+      "loc": "City, State from resume",
+      "sd": "MMM YYYY from resume",
+      "ed": "MMM YYYY from resume",
+      "b": [
         "Rewritten XYZ bullet with technology name AND metric scoring 5+/7",
         "Another rewritten bullet with specific framework AND percentage"
       ]
