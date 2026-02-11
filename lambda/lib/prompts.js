@@ -14,6 +14,7 @@ CRITICAL RULES:
 4. Each bullet must follow Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
 5. Include specific metrics, technologies, and quantifiable results
 6. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+7. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
 JSON SCHEMA:
 {
@@ -63,9 +64,10 @@ BULLET REQUIREMENTS:
 - Keep under 200 characters
 - Focus on achievements, not responsibilities
 
-TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
 function buildSystemPromptXL() {
@@ -78,6 +80,7 @@ CRITICAL RULES:
 4. Each bullet must follow Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
 5. EVERY bullet MUST include ALL THREE: (a) strong action verb, (b) specific technology/framework name, (c) quantifiable metric
 6. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+7. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. For example: RAG (2023), LangChain (2022), Generative AI (2022) — do NOT put these in roles starting before those years. See the full TECHNOLOGY TIMELINE below.
 
 QUALITY REQUIREMENT — EVERY BULLET MUST SCORE 5+/7:
 Each bullet is scored on these criteria (aim for 5+ total points):
@@ -147,15 +150,17 @@ BULLET REQUIREMENTS:
 - Keep under 250 characters
 - Focus on achievements, not responsibilities
 - Maximize technology keyword density — every bullet references a specific tech, framework, or methodology
+- NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below). If a JD keyword like "RAG" or "LangChain" didn't exist during a role's dates, use an alternative technology that DID exist at that time
 
 PROFESSIONAL SUMMARY REQUIREMENTS:
 - Write 5-8 sentences covering experience breadth, key technologies, cloud platforms, methodologies, and domain expertise
 - Pack with keywords: programming languages, frameworks, cloud services, databases, and methodologies from the JD
 - Include years of experience, scale of systems worked on, and industry context
 
-TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
 }
 
 function buildUserMessage(jd, customer, context) {
@@ -346,6 +351,7 @@ CRITICAL RULES:
 10. OPTIMIZE the professional summary for the target role
 11. REORDER technical skills to prioritize what the JD asks for
 12. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+13. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
 JSON SCHEMA:
 {
@@ -405,9 +411,10 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 
-TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
 function buildOptimizeSystemPromptXL() {
@@ -426,6 +433,7 @@ CRITICAL RULES:
 10. OPTIMIZE the professional summary for the target role — make it 5-8 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
 12. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. For example: RAG (2023), LangChain (2022), Generative AI (2022) — do NOT put these in roles starting before those years. See the full TECHNOLOGY TIMELINE below.
 
 QUALITY REQUIREMENT — EVERY BULLET MUST SCORE 5+/7:
 Each bullet is scored on these criteria (aim for 5+ total points):
@@ -507,9 +515,10 @@ OPTIMIZATION RULES:
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
 
-TECHNOLOGY TIMELINE — DO NOT use these technologies in roles dated BEFORE their introduction year:
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-Only mention a technology in a role if the role's start date is on or after the year listed above. For example, do NOT put "RAG" in a role starting before 2023.`;
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
 function buildOptimizeUserMessage(resume, jd, context) {
