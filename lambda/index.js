@@ -101,14 +101,14 @@ function getHeaders(event) {
 // ── Route: POST /analyze ──
 
 async function handleAnalyze(body) {
-  const { jd, customer, context, model: modelInput, xlMode } = body;
+  const { jd, customer, context, model: modelInput, xlMode, companies } = body;
 
   if (!jd || jd.trim().length < 50) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
   const systemPrompt = xlMode ? buildSystemPromptXL() : buildSystemPrompt();
-  const userMessage = buildUserMessage(jd, customer, context);
+  const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
   // Call OpenRouter
@@ -326,10 +326,10 @@ if (typeof awslambda !== "undefined") {
       model = resolveModel(modelInput);
       mode = "optimize";
     } else if (path.includes("/analyze") && method === "POST") {
-      const { jd, customer, context, model: modelInput } = body;
+      const { jd, customer, context, model: modelInput, companies } = body;
       if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
       systemPrompt = buildSystemPrompt();
-      userMessage = buildUserMessage(jd, customer, context);
+      userMessage = buildUserMessage(jd, customer, context, companies);
       model = resolveModel(modelInput);
       mode = "generate";
     } else {

@@ -64,6 +64,18 @@ BULLET REQUIREMENTS:
 - Keep under 200 characters
 - Focus on achievements, not responsibilities
 
+COMPANY & DOMAIN CONTEXT:
+- When specific companies are provided, use your knowledge of that company to generate
+  domain-appropriate bullet points. This means:
+  - Use industry-specific terminology (e.g., "clinical trials" for pharma, "capital allocation" for fintech)
+  - Reference domain-specific tools and platforms (e.g., Veeva CRM for pharma, Basel III for banking)
+  - Create realistic project scenarios that someone at that company would actually work on
+  - The JD's requirements determine WHICH aspects of the domain to emphasize
+- When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
+  generate domain-appropriate content without referencing a specific employer
+- If the user provides a description of what they did at a company, use it to anchor the bullet points
+  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
@@ -157,26 +169,51 @@ PROFESSIONAL SUMMARY REQUIREMENTS:
 - Pack with keywords: programming languages, frameworks, cloud services, databases, and methodologies from the JD
 - Include years of experience, scale of systems worked on, and industry context
 
+COMPANY & DOMAIN CONTEXT:
+- When specific companies are provided, use your knowledge of that company to generate
+  domain-appropriate bullet points. This means:
+  - Use industry-specific terminology (e.g., "clinical trials" for pharma, "capital allocation" for fintech)
+  - Reference domain-specific tools and platforms (e.g., Veeva CRM for pharma, Basel III for banking)
+  - Create realistic project scenarios that someone at that company would actually work on
+  - The JD's requirements determine WHICH aspects of the domain to emphasize
+- When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
+  generate domain-appropriate content without referencing a specific employer
+- If the user provides a description of what they did at a company, use it to anchor the bullet points
+  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
 CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
 }
 
-function buildUserMessage(jd, customer, context) {
+function buildUserMessage(jd, customer, context, companies) {
   let message = `Generate a resume for this job description:\n\n${jd}`;
-  
+
   if (customer) {
-    message += `\n\nTarget company: ${customer}`;
+    message += `\n\nTarget company (the company being applied to): ${customer}`;
+  }
+
+  if (companies && companies.length > 0) {
+    message += `\n\nWORK HISTORY COMPANIES (use these as the candidate's past employers, in order from most recent to earliest):`;
+    companies.forEach((c, i) => {
+      message += `\n\nCompany ${i + 1}: ${c.name}`;
+      if (c.title) message += `\n  Title: ${c.title}`;
+      if (c.description) message += `\n  What they did: ${c.description}`;
+    });
+
+    if (companies.length < 3) {
+      message += `\n\nNote: Only ${companies.length} company${companies.length === 1 ? '' : 'ies'} provided. Fill remaining roles to reach 3-4 total companies over 6-7 years. Use one IT services firm (e.g., ${config.IT_SERVICES_FIRMS.slice(0, 3).join(", ")}) as the earliest role, and fill any other gaps with a relevant competitor company from the target industry.`;
+    }
+  } else {
     message += `\nUse competitor companies in work history where relevant.`;
   }
-  
+
   if (context) {
     message += `\n\nAdditional context: ${context}`;
   }
-  
+
   message += `\n\nReturn ONLY the JSON response with no additional text or formatting.`;
-  
   return message;
 }
 

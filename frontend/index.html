@@ -568,6 +568,39 @@
       font-family: var(--mono);
     }
 
+    /* ── Company entries ── */
+    .company-entry {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .company-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .company-header span {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .company-entry input,
+    .company-entry textarea {
+      margin-top: 8px;
+    }
+
+    .company-entry textarea {
+      min-height: 60px;
+      font-family: var(--font);
+      font-size: 14px;
+    }
+
     /* ── Client sub-entry ── */
     .client-entry {
       margin-left: 20px;
@@ -657,6 +690,13 @@
             <option value="mistral-large">Mistral Large</option>
           </select>
         </div>
+      </div>
+
+      <div class="field-group" id="companies-field" style="display:none;">
+        <label>Work History Companies <span style="color:var(--text-muted);text-transform:none;font-weight:400;">(optional, max 4)</span></label>
+        <div id="companies-container"></div>
+        <button type="button" class="btn-small" id="add-company-btn" onclick="addCompanyField()">+ Add Company</button>
+        <p class="field-hint">Specify past employers for the generated resume. Most recent first. Leave empty to let AI choose.</p>
       </div>
 
       <div class="field-group">
@@ -823,6 +863,7 @@
       document.getElementById("tab-generate").classList.toggle("active", mode === "generate");
       document.getElementById("resume-field").style.display = mode === "optimize" ? "block" : "none";
       document.getElementById("customer-field").style.display = mode === "generate" ? "block" : "none";
+      document.getElementById("companies-field").style.display = mode === "generate" ? "block" : "none";
       document.getElementById("generate-btn").textContent = mode === "optimize" ? "Optimize Resume" : "Generate Resume";
     }
 
@@ -880,6 +921,65 @@
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       return result.value.trim();
+    }
+
+    // ── Company input management ──
+    var MAX_COMPANIES = 4;
+
+    function addCompanyField() {
+      var container = document.getElementById("companies-container");
+      var count = container.querySelectorAll(".company-entry").length;
+      if (count >= MAX_COMPANIES) return;
+
+      var index = count;
+      var div = document.createElement("div");
+      div.className = "company-entry";
+      div.innerHTML =
+        '<div class="company-header">' +
+          '<span>Company ' + (index + 1) + '</span>' +
+          '<button type="button" class="btn-small" onclick="removeCompanyField(this)">Remove</button>' +
+        '</div>' +
+        '<input type="text" class="company-name" placeholder="Company name or domain (e.g., Capital One, Pharma)">' +
+        '<input type="text" class="company-title" placeholder="Title (optional, e.g., Senior Software Engineer)">' +
+        '<textarea class="company-desc" placeholder="Description (optional — what you did there)"></textarea>';
+      container.appendChild(div);
+
+      updateCompanyUI();
+    }
+
+    function removeCompanyField(btn) {
+      btn.closest(".company-entry").remove();
+      renumberCompanies();
+      updateCompanyUI();
+    }
+
+    function renumberCompanies() {
+      var entries = document.querySelectorAll("#companies-container .company-entry");
+      for (var i = 0; i < entries.length; i++) {
+        entries[i].querySelector(".company-header span").textContent = "Company " + (i + 1);
+      }
+    }
+
+    function updateCompanyUI() {
+      var count = document.querySelectorAll("#companies-container .company-entry").length;
+      document.getElementById("add-company-btn").style.display = count >= MAX_COMPANIES ? "none" : "";
+    }
+
+    function getCompaniesData() {
+      var entries = document.querySelectorAll("#companies-container .company-entry");
+      var companies = [];
+      for (var i = 0; i < entries.length; i++) {
+        var el = entries[i];
+        var name = el.querySelector(".company-name").value.trim();
+        if (!name) continue;
+        var obj = { name: name };
+        var title = el.querySelector(".company-title").value.trim();
+        var desc = el.querySelector(".company-desc").value.trim();
+        if (title) obj.title = title;
+        if (desc) obj.description = desc;
+        companies.push(obj);
+      }
+      return companies;
     }
 
     // ── Progress animation ──
@@ -995,10 +1095,12 @@
       } else {
         endpoint = "/analyze";
         const customer = document.getElementById("customer-input").value.trim();
+        const companies = getCompaniesData();
         payload = {
           jd, model,
           customer: customer || undefined,
           context: context || undefined,
+          companies: companies.length > 0 ? companies : undefined,
         };
       }
 
