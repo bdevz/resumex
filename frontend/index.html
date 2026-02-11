@@ -1104,63 +1104,68 @@
         };
       }
 
-      const maxRetries = 1;
-      let lastErr = null;
+      try {
+        // Step 1: Submit job
+        const resp = await fetch(API_BASE + endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Passphrase": currentPassphrase,
+          },
+          body: JSON.stringify(payload),
+        });
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          if (attempt > 0) {
-            // Retry after 503 timeout
-            document.getElementById("progress-time").textContent = "Retrying (AI needed more time)...";
-          }
-
-          const resp = await fetch(API_BASE + endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Passphrase": currentPassphrase,
-            },
-            body: JSON.stringify(payload),
-          });
-
-          if (resp.status === 401) throw new Error("Invalid passphrase.");
-
-          // 503 = API Gateway timed out waiting for Lambda — retry once
-          if (resp.status === 503 && attempt < maxRetries) {
-            lastErr = new Error("AI is taking longer than expected. Retrying...");
-            continue;
-          }
-
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.error || `Server error (${resp.status})`);
-
-          stopProgress();
-          currentResumeData = data.resumeData;
-
-          // Brief pause before showing results
-          await new Promise(r => setTimeout(r, 600));
-          document.getElementById("progress").style.display = "none";
-          renderResults(data);
-          return;
-
-        } catch (err) {
-          lastErr = err;
-          // Only retry on network/503 errors
-          if (attempt < maxRetries && (err.message.includes("503") || err.message.includes("Failed to fetch") || err.message.includes("NetworkError"))) {
-            continue;
-          }
-          break;
+        if (resp.status === 401) throw new Error("Invalid passphrase.");
+        if (!resp.ok) {
+          const errBody = await resp.json().catch(() => ({}));
+          throw new Error(errBody.error || `Server error (${resp.status})`);
         }
-      }
 
-      // All retries exhausted
-      stopProgress();
-      document.getElementById("progress").style.display = "none";
-      const errMsg = lastErr?.message?.includes("503")
-        ? "The AI model took too long to respond. Try again with a shorter job description or a faster model (Claude Haiku or GPT-4o Mini)."
-        : lastErr?.message || "Unknown error";
-      showError(errMsg);
-      document.getElementById("main-form").style.display = "block";
+        const submitData = await resp.json();
+
+        // Step 2: If async job, poll for result
+        let data;
+        if (submitData.jobId) {
+          data = await pollForResult(submitData.jobId);
+        } else {
+          data = submitData;
+        }
+
+        if (!data || !data.resumeData) {
+          throw new Error(data?.error || "No resume data received. Try again.");
+        }
+
+        stopProgress();
+        currentResumeData = data.resumeData;
+
+        // Brief pause before showing results
+        await new Promise(r => setTimeout(r, 600));
+        document.getElementById("progress").style.display = "none";
+        renderResults(data);
+
+      } catch (err) {
+        stopProgress();
+        document.getElementById("progress").style.display = "none";
+        showError(err.message || "Unknown error");
+        document.getElementById("main-form").style.display = "block";
+      }
+    }
+
+    async function pollForResult(jobId) {
+      var maxAttempts = 60; // 60 * 3s = 3 minutes max
+      for (var i = 0; i < maxAttempts; i++) {
+        await new Promise(function(r) { setTimeout(r, 3000); });
+        var resp = await fetch(API_BASE + "/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase },
+          body: JSON.stringify({ jobId: jobId }),
+        });
+        if (!resp.ok) continue;
+        var data = await resp.json();
+        if (data.status === "complete") return data;
+        if (data.status === "error") throw new Error(data.error || "Job failed. Try again.");
+      }
+      throw new Error("Request timed out after 3 minutes. Try a faster model.");
     }
 
     // ── Render results ──
