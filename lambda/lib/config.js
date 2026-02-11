@@ -17,32 +17,38 @@
 
 const API = {
   // Default model — change this when new models drop
-  default_model: "google/gemini-3-pro-preview",
+  default_model: "moonshotai/kimi-k2.5",
 
   // All available models on OpenRouter (update this list as new models release)
   // Format: "provider/model-name" — this is how OpenRouter identifies models
   models: {
+    // Moonshot
+    "kimi-k2.5":         "moonshotai/kimi-k2.5",
+    // Google
+    "gemini-3-pro":      "google/gemini-3-pro-preview",
+    "gemini-3-flash":    "google/gemini-3-flash-preview",
+    "gemini-2.5-pro":    "google/gemini-2.5-pro",
     // Anthropic
     "claude-sonnet":     "anthropic/claude-sonnet-4.5",
     "claude-haiku":      "anthropic/claude-sonnet-4.5",
     "claude-opus":       "anthropic/claude-opus-4.5",
     // OpenAI
     "gpt-4o":            "openai/gpt-4o",
-    "gpt-4o-mini":       "openai/gpt-4o-mini",
     "gpt-4.1":           "openai/gpt-4.1",
     "gpt-4.1-mini":      "openai/gpt-4.1-mini",
-    "o3-mini":           "openai/o3-mini",
-    // Google
-    "gemini-3-pro":      "google/gemini-3-pro-preview",
-    "gemini-2.5-pro":    "google/gemini-2.5-pro",
-    "gemini-2-flash":    "google/gemini-2.0-flash-001",
     // DeepSeek
-    "deepseek-v3":       "deepseek/deepseek-chat",
+    "deepseek-v3.2":     "deepseek/deepseek-v3.2",
     "deepseek-r1":       "deepseek/deepseek-reasoner",
-    // Meta
-    "llama-3.3-70b":     "meta-llama/llama-3.3-70b-instruct",
+    // MiniMax
+    "minimax-m2.1":      "minimax/minimax-m2.1",
+    // xAI
+    "grok-4.1-fast":     "x-ai/grok-4.1-fast",
     // Mistral
     "mistral-large":     "mistralai/mistral-large-2411",
+    // Free models
+    "trinity-large:free": "arcee-ai/trinity-large-preview:free",
+    "step-3.5-flash:free": "stepfun/step-3.5-flash:free",
+    "glm-4.5-air:free":  "z-ai/glm-4.5-air:free",
   },
 };
 
