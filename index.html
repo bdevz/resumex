@@ -800,7 +800,7 @@
       <div class="results-header">
         <h2>Generated Resume</h2>
         <div style="display:flex;gap:10px;">
-          <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+          <button class="btn-primary" onclick="downloadDocx(event)">Download .docx</button>
           <button class="btn-secondary" onclick="startOver()">Start Over</button>
         </div>
       </div>
@@ -844,7 +844,7 @@
 
       <!-- Download again -->
       <div style="text-align:center;margin-top:24px;">
-        <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+        <button class="btn-primary" onclick="downloadDocx(event)">Download .docx</button>
       </div>
     </div>
 
@@ -1268,10 +1268,10 @@
     }
 
     // ── Download DOCX ──
-    async function downloadDocx() {
+    async function downloadDocx(e) {
       if (!currentResumeData) return;
 
-      const btn = event.target;
+      const btn = e ? e.target : document.querySelector('[onclick*="downloadDocx"]');
       btn.textContent = "Building...";
       btn.disabled = true;
 

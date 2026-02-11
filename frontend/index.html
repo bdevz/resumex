@@ -879,7 +879,7 @@
       <div class="results-header">
         <h2 id="results-title">Optimized Resume</h2>
         <div style="display:flex;gap:10px;">
-          <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+          <button class="btn-primary" onclick="downloadDocx(event)">Download .docx</button>
           <button class="btn-secondary" onclick="startOver()">Start Over</button>
         </div>
       </div>
@@ -923,7 +923,7 @@
 
       <!-- Download again -->
       <div style="text-align:center;margin-top:24px;">
-        <button class="btn-primary" onclick="downloadDocx()">Download .docx</button>
+        <button class="btn-primary" onclick="downloadDocx(event)">Download .docx</button>
       </div>
     </div>
 
@@ -1262,12 +1262,13 @@
       startProgress();
 
       // Build request
+      const xlMode = document.getElementById("xl-mode").checked;
       let endpoint, payload;
       if (currentMode === "optimize") {
         endpoint = "/optimize";
         payload = {
           resume: document.getElementById("resume-input").value.trim(),
-          jd, model,
+          jd, model, xlMode,
           context: context || undefined,
         };
       } else {
@@ -1275,7 +1276,7 @@
         const customer = document.getElementById("customer-input").value.trim();
         const companies = getCompaniesData();
         payload = {
-          jd, model,
+          jd, model, xlMode,
           customer: customer || undefined,
           context: context || undefined,
           companies: companies.length > 0 ? companies : undefined,
@@ -1330,20 +1331,33 @@
     }
 
     async function pollForResult(jobId) {
-      var maxAttempts = 60; // 60 * 3s = 3 minutes max
+      var maxAttempts = 90; // 90 * 3s = 4.5 minutes max (Lambda timeout is 5 min)
+      var networkErrors = 0;
       for (var i = 0; i < maxAttempts; i++) {
         await new Promise(function(r) { setTimeout(r, 3000); });
-        var resp = await fetch(API_BASE + "/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase },
-          body: JSON.stringify({ jobId: jobId }),
-        });
-        if (!resp.ok) continue;
-        var data = await resp.json();
-        if (data.status === "complete") return data;
-        if (data.status === "error") throw new Error(data.error || "Job failed. Try again.");
+        try {
+          var resp = await fetch(API_BASE + "/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase },
+            body: JSON.stringify({ jobId: jobId }),
+          });
+          if (!resp.ok) continue;
+          var data = await resp.json();
+          if (data.status === "complete") return data;
+          if (data.status === "error") {
+            var msg = data.error || "Job failed.";
+            if (data.details) msg += " Details: " + (typeof data.details === "string" ? data.details.substring(0, 200) : JSON.stringify(data.details).substring(0, 200));
+            throw new Error(msg);
+          }
+          // status === "processing" — keep polling
+          networkErrors = 0;
+        } catch (err) {
+          if (err.message && !err.message.includes("fetch")) throw err; // re-throw app errors
+          networkErrors++;
+          if (networkErrors > 5) throw new Error("Lost connection to server. Check your network and try again.");
+        }
       }
-      throw new Error("Request timed out after 3 minutes. Try a faster model.");
+      throw new Error("Request timed out. The model may be overloaded — try a different one.");
     }
 
     // ── Render results ──
@@ -1374,15 +1388,15 @@
       }
 
       // Score
-      document.getElementById("avg-score").textContent = scoring.average;
-      document.getElementById("score-count").textContent = `across ${scoring.bulletCount} bullets (out of 7)`;
+      document.getElementById("avg-score").textContent = scoring ? scoring.average : "—";
+      document.getElementById("score-count").textContent = scoring ? `across ${scoring.bulletCount} bullets (out of 7)` : "";
 
       // Timeline warnings
       const warningsEl = document.getElementById("timeline-warnings");
       warningsEl.innerHTML = "";
-      if (timeline_warnings.length > 0) {
+      if (timeline_warnings && timeline_warnings.length > 0) {
         for (const w of timeline_warnings) {
-          warningsEl.innerHTML += `<div class="warning-item">${w}</div>`;
+          warningsEl.innerHTML += `<div class="warning-item">${escapeHtml(w)}</div>`;
         }
       }
 
@@ -1394,7 +1408,7 @@
       skillsEl.innerHTML = "";
       if (resumeData.technical_skills) {
         for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
-          skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${cat}:</span><span class="skills-list">${skills}</span></div>`;
+          skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${escapeHtml(cat)}:</span><span class="skills-list">${escapeHtml(skills)}</span></div>`;
         }
       }
 
@@ -1412,23 +1426,23 @@
         }
       }
 
-      for (const exp of resumeData.experience) {
+      for (const exp of (resumeData.experience || [])) {
         let html = `<div class="exp-entry">`;
-        html += `<div class="exp-company">${exp.company} <span class="exp-dates">${exp.start_date} — ${exp.end_date}</span></div>`;
+        html += `<div class="exp-company">${escapeHtml(exp.company || "")} <span class="exp-dates">${escapeHtml(exp.start_date || "")} — ${escapeHtml(exp.end_date || "")}</span></div>`;
 
         if (exp.is_consulting && exp.clients) {
-          html += `<div class="exp-title">${exp.title || "Software Engineer"} &middot; ${exp.location || ""}</div>`;
+          html += `<div class="exp-title">${escapeHtml(exp.title || "Software Engineer")} &middot; ${escapeHtml(exp.location || "")}</div>`;
           for (const client of exp.clients) {
             html += `<div class="client-entry">`;
-            html += `<div class="client-name">Client: ${client.client_name} <span class="exp-dates">${client.start_date} — ${client.end_date}</span></div>`;
-            html += `<div class="exp-title">${client.title || ""}</div>`;
+            html += `<div class="client-name">Client: ${escapeHtml(client.client_name || "")} <span class="exp-dates">${escapeHtml(client.start_date || "")} — ${escapeHtml(client.end_date || "")}</span></div>`;
+            html += `<div class="exp-title">${escapeHtml(client.title || "")}</div>`;
             for (const bullet of client.bullets || []) {
               html += renderBullet(bullet, scoringMap);
             }
             html += `</div>`;
           }
         } else {
-          html += `<div class="exp-title">${exp.title || ""} &middot; ${exp.location || ""}</div>`;
+          html += `<div class="exp-title">${escapeHtml(exp.title || "")} &middot; ${escapeHtml(exp.location || "")}</div>`;
           for (const bullet of exp.bullets || []) {
             html += renderBullet(bullet, scoringMap);
           }
@@ -1471,10 +1485,10 @@
     }
 
     // ── Download DOCX ──
-    async function downloadDocx() {
+    async function downloadDocx(e) {
       if (!currentResumeData) return;
 
-      const btn = event.target;
+      const btn = e ? e.target : document.querySelector('[onclick*="downloadDocx"]');
       btn.textContent = "Building...";
       btn.disabled = true;
 

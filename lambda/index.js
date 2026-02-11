@@ -146,7 +146,7 @@ async function handleAnalyze(body) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: xlMode ? 8192 : 4096,
+      max_tokens: xlMode ? 16384 : 8192,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -165,13 +165,29 @@ async function handleAnalyze(body) {
   }
 
   const data = await orResponse.json();
+
+  // Check for API-level errors (model unavailable, content filtered, etc.)
+  if (data.error) {
+    console.error("OpenRouter API error:", JSON.stringify(data.error));
+    return response(422, {
+      error: data.error.message || "Model returned an error. Try a different model.",
+    });
+  }
+
   const responseText = data.choices?.[0]?.message?.content || "";
+  const finishReason = data.choices?.[0]?.finish_reason;
+  if (!responseText) {
+    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+  }
 
   // Parse JSON
   const resumeData = extractJSON(responseText);
   if (!resumeData) {
+    const truncated = finishReason === "length";
     return response(422, {
-      error: "LLM returned invalid JSON. Try again or use a different model.",
+      error: truncated
+        ? "Model response was cut off (too long). Try a different model."
+        : "Model returned invalid JSON. Try again or use a different model.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -215,7 +231,7 @@ async function handleOptimize(body) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: xlMode ? 8192 : 4096,
+      max_tokens: xlMode ? 16384 : 8192,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -234,13 +250,28 @@ async function handleOptimize(body) {
   }
 
   const data = await orResponse.json();
+
+  if (data.error) {
+    console.error("OpenRouter API error:", JSON.stringify(data.error));
+    return response(422, {
+      error: data.error.message || "Model returned an error. Try a different model.",
+    });
+  }
+
   const responseText = data.choices?.[0]?.message?.content || "";
+  const finishReason = data.choices?.[0]?.finish_reason;
+  if (!responseText) {
+    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+  }
 
   // Parse JSON
   const resumeData = extractJSON(responseText);
   if (!resumeData) {
+    const truncated = finishReason === "length";
     return response(422, {
-      error: "LLM returned invalid JSON. Try again or use a different model.",
+      error: truncated
+        ? "Model response was cut off (too long). Try a different model."
+        : "Model returned invalid JSON. Try again or use a different model.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -479,8 +510,8 @@ async function readJobResult(jobId) {
     const text = await obj.Body.transformToString();
     return JSON.parse(text);
   } catch (err) {
-    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404 || err.name === "AccessDenied") return null;
-    throw err;
+    // Any S3 error means result isn't ready yet — return null so polling continues
+    return null;
   }
 }
 
@@ -488,15 +519,20 @@ async function startAsyncJob(body, route) {
   const jobId = crypto.randomUUID();
   const asyncPayload = { ...body, __jobId: jobId, __route: route };
 
-  await lambda.send(new InvokeCommand({
-    FunctionName: "resume-generator",
-    InvocationType: "Event",
-    Payload: JSON.stringify({
-      __asyncJob: true,
-      body: JSON.stringify(asyncPayload),
-      headers: { "x-passphrase": process.env.SHARED_PASSPHRASE },
-    }),
-  }));
+  try {
+    await lambda.send(new InvokeCommand({
+      FunctionName: "resume-generator",
+      InvocationType: "Event",
+      Payload: JSON.stringify({
+        __asyncJob: true,
+        body: JSON.stringify(asyncPayload),
+        headers: { "x-passphrase": process.env.SHARED_PASSPHRASE },
+      }),
+    }));
+  } catch (err) {
+    console.error("Failed to start async job:", err);
+    return response(500, { error: "Failed to start job. Try again." });
+  }
 
   return response(202, { jobId, status: "processing" });
 }
@@ -516,7 +552,26 @@ exports.handler = async (event) => {
         result = await handleAnalyze(body);
       }
       const resultBody = JSON.parse(result.body);
-      await writeJobResult(jobId, { status: "complete", ...resultBody });
+
+      // Check if the handler returned a non-200 status (LLM API error, invalid JSON, etc.)
+      if (result.statusCode >= 400) {
+        await writeJobResult(jobId, {
+          status: "error",
+          error: resultBody.error || `Request failed (${result.statusCode})`,
+          details: resultBody.details || resultBody.raw_preview || undefined,
+        });
+      } else {
+        // Success — write result without spreading (avoids status field collision)
+        await writeJobResult(jobId, {
+          status: "complete",
+          resumeData: resultBody.resumeData,
+          scoring: resultBody.scoring,
+          timeline_warnings: resultBody.timeline_warnings,
+          model_used: resultBody.model_used,
+          usage: resultBody.usage,
+          mode: resultBody.mode,
+        });
+      }
     } catch (err) {
       console.error("Async job error:", err);
       await writeJobResult(jobId, { status: "error", error: err.message });
