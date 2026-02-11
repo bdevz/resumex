@@ -22,6 +22,31 @@ const s3 = new S3Client({ region: "us-east-1" });
 const lambda = new LambdaClient({ region: "us-east-1" });
 const JOB_BUCKET = "resumex-526810258535";
 
+// ── JSON extraction (handles markdown fences, preamble text, etc.) ──
+
+function extractJSON(text) {
+  if (!text || !text.trim()) return null;
+
+  // 1. Try direct parse first (model returned clean JSON)
+  try { return JSON.parse(text.trim()); } catch {}
+
+  // 2. Strip markdown code fences (```json, ```JSON, ```, etc.)
+  const fenceMatch = text.match(/```(?:json|JSON)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) {
+    try { return JSON.parse(fenceMatch[1].trim()); } catch {}
+  }
+
+  // 3. Find first { and last } — extract the JSON object
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.substring(firstBrace, lastBrace + 1);
+    try { return JSON.parse(candidate); } catch {}
+  }
+
+  return null;
+}
+
 // ── Helpers ──
 
 function response(statusCode, body, extraHeaders = {}) {
@@ -143,15 +168,11 @@ async function handleAnalyze(body) {
   const responseText = data.choices?.[0]?.message?.content || "";
 
   // Parse JSON
-  const cleaned = responseText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-  let resumeData;
-  try {
-    resumeData = JSON.parse(cleaned);
-  } catch (e) {
+  const resumeData = extractJSON(responseText);
+  if (!resumeData) {
     return response(422, {
-      error: "LLM returned invalid JSON. Try again or use claude-sonnet.",
-      raw_preview: cleaned.substring(0, 300),
+      error: "LLM returned invalid JSON. Try again or use a different model.",
+      raw_preview: responseText.substring(0, 500),
     });
   }
 
@@ -216,15 +237,11 @@ async function handleOptimize(body) {
   const responseText = data.choices?.[0]?.message?.content || "";
 
   // Parse JSON
-  const cleaned = responseText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-  let resumeData;
-  try {
-    resumeData = JSON.parse(cleaned);
-  } catch (e) {
+  const resumeData = extractJSON(responseText);
+  if (!resumeData) {
     return response(422, {
-      error: "LLM returned invalid JSON. Try again or use claude-sonnet.",
-      raw_preview: cleaned.substring(0, 300),
+      error: "LLM returned invalid JSON. Try again or use a different model.",
+      raw_preview: responseText.substring(0, 500),
     });
   }
 
@@ -419,10 +436,9 @@ if (typeof awslambda !== "undefined") {
     }
 
     // Parse complete response and send final structured data
-    const cleaned = fullText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    const resumeData = extractJSON(fullText);
 
-    try {
-      const resumeData = JSON.parse(cleaned);
+    if (resumeData) {
       const scoring = scoreResume(resumeData);
       const timeline_warnings = validateTimeline(resumeData);
 
@@ -434,8 +450,8 @@ if (typeof awslambda !== "undefined") {
         model_used: model,
         mode: mode === "optimize" ? "optimize" : undefined,
       })}\n\n`);
-    } catch (e) {
-      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM returned invalid JSON. Try again." })}\n\n`);
+    } else {
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM returned invalid JSON. Try again or use a different model." })}\n\n`);
     }
 
     responseStream.write("data: [DONE]\n\n");
