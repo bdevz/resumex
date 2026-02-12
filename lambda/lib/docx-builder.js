@@ -545,7 +545,7 @@ async function buildResume(resumeData, customContact = null, options = {}) {
   }
   const contact = resumeData.contact || customContact || config.CONTACT;
   const education = includeEducation
-    ? (resumeData.education || null)
+    ? (resumeData.education || [])
     : null;
 
   let doc;
