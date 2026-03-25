@@ -11,7 +11,7 @@
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
-const { buildSystemPrompt, buildSystemPromptXL, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { buildSystemPrompt, buildSystemPromptXL, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeUserMessage, scoreResume, fixTimelineViolations, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -237,7 +237,7 @@ async function handleAnalyze(body) {
   }
 
   // Parse JSON and expand short keys to full keys
-  const resumeData = expandKeys(extractJSON(responseText));
+  let resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
     const truncated = stopReason === "max_tokens";
     return response(422, {
@@ -247,6 +247,9 @@ async function handleAnalyze(body) {
       raw_preview: responseText.substring(0, 500),
     });
   }
+
+  // Auto-fix timeline violations (e.g. RAG in pre-2023 roles)
+  resumeData = fixTimelineViolations(resumeData);
 
   const scoring = scoreResume(resumeData);
   const timeline_warnings = validateTimeline(resumeData);
@@ -321,7 +324,7 @@ async function handleOptimize(body) {
   }
 
   // Parse JSON and expand short keys to full keys
-  const resumeData = expandKeys(extractJSON(responseText));
+  let resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
     const truncated = stopReason === "max_tokens";
     return response(422, {
@@ -331,6 +334,9 @@ async function handleOptimize(body) {
       raw_preview: responseText.substring(0, 500),
     });
   }
+
+  // Auto-fix timeline violations (e.g. RAG in pre-2023 roles)
+  resumeData = fixTimelineViolations(resumeData);
 
   const scoring = scoreResume(resumeData);
   const timeline_warnings = validateTimeline(resumeData);
@@ -520,8 +526,11 @@ if (typeof awslambda !== "undefined") {
       }
     }
 
-    // Parse complete response and expand short keys to full keys
-    const resumeData = expandKeys(extractJSON(fullText));
+    // Parse complete response, expand short keys, fix timeline violations
+    let resumeData = expandKeys(extractJSON(fullText));
+    if (resumeData) {
+      resumeData = fixTimelineViolations(resumeData);
+    }
 
     if (resumeData) {
       const scoring = scoreResume(resumeData);

@@ -272,6 +272,7 @@ const TECH_TIMELINE = {
   "langchain": { earliest: 2022 },
   "llm": { earliest: 2022 },
   "rag": { earliest: 2023 },
+  "retrieval-augmented generation": { earliest: 2023 },
   "vector database": { earliest: 2022 },
   "github copilot": { earliest: 2021 },
   "terraform": { earliest: 2015 },
@@ -294,6 +295,21 @@ const TECH_TIMELINE = {
   "apache spark": { earliest: 2014 },
   "spring boot": { earliest: 2014 },
   "microservices": { earliest: 2012 },
+};
+
+// Era-appropriate replacements for timeline violations
+const TECH_REPLACEMENTS = {
+  "rag": "NLP",
+  "retrieval-augmented generation": "NLP",
+  "langchain": "NLP orchestration",
+  "llm": "ML",
+  "vector database": "search index",
+  "chatgpt": "NLP system",
+  "openai api": "ML API",
+  "github copilot": "code analysis tools",
+  "generative ai": "machine learning",
+  "bun": "Node.js",
+  "deno": "Node.js",
 };
 
 // --- Skill categories for the Technical Skills section ---
@@ -328,6 +344,7 @@ module.exports = {
   COMPETITOR_MAPS,
   CLOUD_ECOSYSTEMS,
   TECH_TIMELINE,
+  TECH_REPLACEMENTS,
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
 };

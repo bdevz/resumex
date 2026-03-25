@@ -367,6 +367,48 @@ function scoreBullet(bullet) {
   };
 }
 
+function fixTimelineViolations(resumeData) {
+  if (!resumeData.experience) return resumeData;
+
+  // Sort tech entries by key length descending so "retrieval-augmented generation"
+  // is processed before "rag", avoiding double replacements
+  const sortedTech = Object.entries(config.TECH_TIMELINE)
+    .sort((a, b) => b[0].length - a[0].length);
+
+  for (const exp of resumeData.experience) {
+    const expYear = parseDate(exp.start_date).getFullYear();
+
+    exp.bullets = (exp.bullets || []).map(bullet => {
+      let fixed = bullet;
+      for (const [tech, timeline] of sortedTech) {
+        if (expYear >= timeline.earliest) continue;
+
+        const escaped = tech.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // Match the term, optionally followed by parenthetical acronym like " (RAG)"
+        const regex = new RegExp(`\\b${escaped}\\b(\\s*\\([A-Z]+\\))?`, "gi");
+        if (!regex.test(fixed)) continue;
+
+        const replacement = config.TECH_REPLACEMENTS[tech.toLowerCase()] || null;
+        // Reset regex lastIndex after test()
+        regex.lastIndex = 0;
+        if (replacement) {
+          fixed = fixed.replace(regex, replacement);
+        } else {
+          fixed = fixed.replace(regex, "").replace(/\s{2,}/g, " ").replace(/,\s*,/g, ",").trim();
+        }
+      }
+      // Clean up: fix double words, article mismatches, extra spaces
+      fixed = fixed.replace(/\b(\w+)\s+\1\b/gi, "$1"); // "NLP NLP" → "NLP"
+      fixed = fixed.replace(/\ban\s+(?=[bcdfghjklmnpqrstvwxyz])/gi, "a "); // "an ML" → "a ML"
+      fixed = fixed.replace(/\ba\s+(?=[aeiou])/gi, "an "); // "a NLP" → "an NLP"
+      fixed = fixed.replace(/\s{2,}/g, " ").trim();
+      return fixed;
+    });
+  }
+
+  return resumeData;
+}
+
 function validateTimeline(resumeData) {
   const warnings = [];
   
@@ -661,5 +703,6 @@ module.exports = {
   buildOptimizeSystemPromptXL,
   buildOptimizeUserMessage,
   scoreResume,
+  fixTimelineViolations,
   validateTimeline
 };
