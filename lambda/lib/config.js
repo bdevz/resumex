@@ -5,50 +5,21 @@
 // ============================================================================
 
 // --- API Configuration ---
-// Three modes:
-//   1. "proxy"      — Coworkers use this. Hits your Vercel URL with a passphrase. No API key needed.
-//   2. "openrouter"  — Direct OpenRouter call. User has their own OpenRouter key.
-//   3. "anthropic"   — Direct Anthropic call. User has their own Anthropic key (legacy).
+// Uses Anthropic Messages API directly.
 //
 // Environment variables:
-//   MODE=proxy          PROXY_URL=https://your-app.vercel.app  TEAM_PASSPHRASE=team-resume-2026
-//   MODE=openrouter     OPENROUTER_API_KEY=sk-or-...           MODEL=anthropic/claude-sonnet-4-20250514
-//   MODE=anthropic      ANTHROPIC_API_KEY=sk-ant-...
+//   ANTHROPIC_API_KEY   — Your Anthropic API key (sk-ant-...)
+//   SHARED_PASSPHRASE   — Passphrase shared with team
 
 const API = {
-  // Default model — change this when new models drop
-  default_model: "moonshotai/kimi-k2.5",
+  // Default model
+  default_model: "claude-sonnet-4-20250514",
 
-  // All available models on OpenRouter (update this list as new models release)
-  // Format: "provider/model-name" — this is how OpenRouter identifies models
+  // Available Anthropic models
   models: {
-    // Moonshot
-    "kimi-k2.5":         "moonshotai/kimi-k2.5",
-    // Google
-    "gemini-3-pro":      "google/gemini-3-pro-preview",
-    "gemini-3-flash":    "google/gemini-3-flash-preview",
-    "gemini-2.5-pro":    "google/gemini-2.5-pro",
-    // Anthropic
-    "claude-sonnet":     "anthropic/claude-sonnet-4.5",
-    "claude-haiku":      "anthropic/claude-sonnet-4.5",
-    "claude-opus":       "anthropic/claude-opus-4.5",
-    // OpenAI
-    "gpt-4o":            "openai/gpt-4o",
-    "gpt-4.1":           "openai/gpt-4.1",
-    "gpt-4.1-mini":      "openai/gpt-4.1-mini",
-    // DeepSeek
-    "deepseek-v3.2":     "deepseek/deepseek-v3.2",
-    "deepseek-r1":       "deepseek/deepseek-reasoner",
-    // MiniMax
-    "minimax-m2.1":      "minimax/minimax-m2.1",
-    // xAI
-    "grok-4.1-fast":     "x-ai/grok-4.1-fast",
-    // Mistral
-    "mistral-large":     "mistralai/mistral-large-2411",
-    // Free models
-    "trinity-large:free": "arcee-ai/trinity-large-preview:free",
-    "step-3.5-flash:free": "stepfun/step-3.5-flash:free",
-    "glm-4.5-air:free":  "z-ai/glm-4.5-air:free",
+    "claude-opus":       "claude-opus-4-20250514",
+    "claude-sonnet":     "claude-sonnet-4-20250514",
+    "claude-haiku":      "claude-haiku-4-5-20251001",
   },
 };
 

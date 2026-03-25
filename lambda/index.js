@@ -7,7 +7,7 @@
 //   GET  /models   — available model list
 //
 // Environment variables (set in Lambda console):
-//   OPENROUTER_API_KEY  — Your OpenRouter API key
+//   ANTHROPIC_API_KEY   — Your Anthropic API key
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
@@ -182,59 +182,57 @@ async function handleAnalyze(body) {
   const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
-  // Call OpenRouter
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
       model,
       max_tokens: xlMode ? 16384 : 8192,
-      response_format: { type: "json_object" },
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
     }),
   });
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text();
-    console.error(`OpenRouter error (${orResponse.status}):`, errText);
-    return response(orResponse.status, {
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
       error: "LLM API error",
-      status: orResponse.status,
+      status: apiResponse.status,
       details: errText,
     });
   }
 
-  const data = await orResponse.json();
+  const data = await apiResponse.json();
 
-  // Check for API-level errors (model unavailable, content filtered, etc.)
-  if (data.error) {
-    console.error("OpenRouter API error:", JSON.stringify(data.error));
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
     return response(422, {
-      error: data.error.message || "Model returned an error. Try a different model.",
+      error: data.error?.message || "Model returned an error.",
     });
   }
 
-  const responseText = data.choices?.[0]?.message?.content || "";
-  const finishReason = data.choices?.[0]?.finish_reason;
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
   if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+    return response(422, { error: "Model returned empty response. Try again." });
   }
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
-    const truncated = finishReason === "length";
+    const truncated = stopReason === "max_tokens";
     return response(422, {
       error: truncated
-        ? "Model response was cut off (too long). Try a different model."
-        : "Model returned invalid JSON. Try again or use a different model.",
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -268,58 +266,57 @@ async function handleOptimize(body) {
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
-  // Call OpenRouter
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
       model,
       max_tokens: xlMode ? 16384 : 8192,
-      response_format: { type: "json_object" },
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
     }),
   });
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text();
-    console.error(`OpenRouter error (${orResponse.status}):`, errText);
-    return response(orResponse.status, {
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
       error: "LLM API error",
-      status: orResponse.status,
+      status: apiResponse.status,
       details: errText,
     });
   }
 
-  const data = await orResponse.json();
+  const data = await apiResponse.json();
 
-  if (data.error) {
-    console.error("OpenRouter API error:", JSON.stringify(data.error));
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
     return response(422, {
-      error: data.error.message || "Model returned an error. Try a different model.",
+      error: data.error?.message || "Model returned an error.",
     });
   }
 
-  const responseText = data.choices?.[0]?.message?.content || "";
-  const finishReason = data.choices?.[0]?.finish_reason;
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
   if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+    return response(422, { error: "Model returned empty response. Try again." });
   }
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
-    const truncated = finishReason === "length";
+    const truncated = stopReason === "max_tokens";
     return response(422, {
       error: truncated
-        ? "Model response was cut off (too long). Try a different model."
-        : "Model returned invalid JSON. Try again or use a different model.",
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -362,7 +359,7 @@ function handleModels() {
     models: Object.entries(config.API.models).map(([alias, id]) => ({
       alias,
       id,
-      provider: id.split("/")[0],
+      provider: "anthropic",
     })),
   });
 }
@@ -446,23 +443,22 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call OpenRouter with streaming
-    let orResponse;
+    // Call Anthropic Messages API with streaming
+    let apiResponse;
     try {
-      orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "X-Title": "Resume Generator",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
           model,
           max_tokens: 4096,
           stream: true,
-          response_format: { type: "json_object" },
+          system: systemPrompt,
           messages: [
-            { role: "system", content: systemPrompt },
             { role: "user", content: userMessage },
           ],
         }),
@@ -473,18 +469,18 @@ if (typeof awslambda !== "undefined") {
       return;
     }
 
-    if (!orResponse.ok) {
-      const errText = await orResponse.text();
-      console.error(`OpenRouter stream error (${orResponse.status}):`, errText);
-      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: orResponse.status })}\n\n`);
+    if (!apiResponse.ok) {
+      const errText = await apiResponse.text();
+      console.error(`Anthropic stream error (${apiResponse.status}):`, errText);
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: apiResponse.status })}\n\n`);
       responseStream.end();
       return;
     }
 
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "AI is writing..." })}\n\n`);
 
-    // Read streaming response from OpenRouter and forward chunks
-    const reader = orResponse.body.getReader();
+    // Read Anthropic SSE stream and forward content deltas
+    const reader = apiResponse.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
     let buffer = "";
@@ -495,21 +491,19 @@ if (typeof awslambda !== "undefined") {
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete SSE lines from OpenRouter
+      // Process complete SSE lines from Anthropic
       const lines = buffer.split("\n");
       buffer = lines.pop(); // Keep incomplete line in buffer
 
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
 
         try {
           const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content || "";
-          if (delta) {
-            fullText += delta;
-            responseStream.write(`data: ${JSON.stringify({ type: "content", delta })}\n\n`);
+          if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            responseStream.write(`data: ${JSON.stringify({ type: "content", delta: parsed.delta.text })}\n\n`);
           }
         } catch {}
       }
