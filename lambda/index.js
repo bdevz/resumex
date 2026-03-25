@@ -130,10 +130,21 @@ function checkAuth(headers) {
   return passphrase && passphrase === process.env.SHARED_PASSPHRASE;
 }
 
+// Anthropic model aliases → direct Anthropic model IDs
+const ANTHROPIC_MODELS = {
+  "claude-opus-4.6": "claude-opus-4-6",
+  "claude-opus-4.5": "claude-opus-4-5-20251101",
+  "claude-sonnet-4.6": "claude-sonnet-4-6",
+  "claude-sonnet-4.5": "claude-sonnet-4-5-20250929",
+  "claude-haiku-4.5": "claude-haiku-4-5-20251001",
+};
+
 function resolveModel(modelInput) {
   if (!modelInput) return config.API.default_model;
-  if (config.API.models[modelInput]) return config.API.models[modelInput];
-  return modelInput;
+  if (ANTHROPIC_MODELS[modelInput]) return ANTHROPIC_MODELS[modelInput];
+  if (modelInput.startsWith("claude-")) return modelInput;
+  console.warn(`Model "${modelInput}" not recognized, using default: ${config.API.default_model}`);
+  return config.API.default_model;
 }
 
 function getPath(event) {
@@ -355,8 +366,8 @@ async function handleBuild(body) {
 
 function handleModels() {
   return response(200, {
-    default: "claude-sonnet",
-    models: Object.entries(config.API.models).map(([alias, id]) => ({
+    default: "claude-opus-4.6",
+    models: Object.entries(ANTHROPIC_MODELS).map(([alias, id]) => ({
       alias,
       id,
       provider: "anthropic",

@@ -13,7 +13,7 @@
 
 const API = {
   // Default model
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-opus-4-6",
 
   // Available Anthropic models
   models: {
@@ -37,15 +37,13 @@ const EDUCATION = {
     degree: "Master of Science in Computer Science",
     school: "University of Texas at Arlington",
     location: "Arlington, TX",
-    start: "Aug 2017",
-    end: "May 2019",
+    graduated: "May 2019",
   },
   bachelors: {
     degree: "Bachelor of Technology in Computer Science and Engineering",
     school: "Vellore Institute of Technology",
     location: "Vellore, India",
-    start: "Jul 2013",
-    end: "May 2017",
+    graduated: "May 2017",
   },
 };
 
@@ -128,12 +126,12 @@ const FORMAT_XL = {
 
 // --- ATS section headers (recognized by all major ATS) ---
 const ATS_HEADERS = {
-  summary: "PROFESSIONAL SUMMARY",
-  skills: "TECHNICAL SKILLS",
-  experience: "PROFESSIONAL EXPERIENCE",
-  education: "EDUCATION",
-  certifications: "CERTIFICATIONS",
-  projects: "PROJECTS",
+  summary: "Summary",
+  skills: "Skills",
+  experience: "Experience",
+  education: "Education",
+  certifications: "Certifications",
+  projects: "Projects",
 };
 
 // --- Google XYZ bullet patterns ---
@@ -142,6 +140,10 @@ const XYZ_PATTERNS = [
   "[Verb] [what], resulting in [metric]",
   "[Verb] [what] using [technology], achieving [metric]",
   "Led [scope] to [verb] [what], resulting in [metric]",
+  // Business-value variants
+  "[Verb] [what] serving [scale], achieving [business outcome]",
+  "[Verb] [scope initiative], partnering with [stakeholders] to deliver [result]",
+  "[Verb] [what] achieving [compliance/SLA], resulting in [business impact]",
 ];
 
 // --- Action verbs by category ---
@@ -150,10 +152,15 @@ const ACTION_VERBS = {
     "Architected", "Built", "Designed", "Developed", "Engineered",
     "Implemented", "Deployed", "Automated", "Migrated", "Integrated",
     "Refactored", "Optimized", "Scaled", "Configured", "Containerized",
+    "Created", "Executed", "Launched", "Modernized", "Consolidated",
   ],
   leadership: [
-    "Led", "Spearheaded", "Drove", "Championed", "Orchestrated",
-    "Pioneered", "Established", "Directed",
+    "Led", "Drove", "Established", "Directed", "Managed", "Oversaw",
+    "Transformed", "Delivered", "Owned",
+  ],
+  impact: [
+    "Achieved", "Secured", "Enabled", "Accelerated", "Improved",
+    "Increased", "Decreased", "Reduced", "Saved", "Enforced",
   ],
   communication: [
     "Presented", "Authored", "Facilitated", "Documented", "Translated",
@@ -167,22 +174,38 @@ const ACTION_VERBS = {
     "Mentored", "Coached", "Trained", "Guided", "Onboarded", "Cultivated",
   ],
   collaboration: [
-    "Collaborated", "Partnered", "Coordinated", "Aligned", "Integrated",
+    "Partnered", "Coordinated", "Aligned", "Integrated",
   ],
 };
+
+// Verbs that should NOT count as "strong" (community consensus: passive, vague, or fluffy)
+const WEAK_VERBS = [
+  "aided", "assisted", "coded", "collaborated", "communicated", "exposed",
+  "helped", "participated", "programmed", "ran", "used", "utilized",
+  "worked", "maintained", "supported", "completed", "handled", "performed",
+  "wrote", "served", "stood", "contributed",
+];
 
 // --- Bullet quality scoring ---
 const QUALITY_SCORING = {
   rules: [
+    // Technical metrics
     { pattern: /\d+%/, points: 2, label: "percentage improvement" },
     { pattern: /\$[\d,]+[KkMmBb]?/, points: 2, label: "dollar amount" },
     { pattern: /from\s+\d.*to\s+\d/i, points: 2, label: "baseline comparison" },
     { pattern: /team of \d+|(\d+)\s*(engineers?|developers?|members?)/i, points: 1, label: "team size" },
-    { pattern: /\b(?:Java|Python|Go|Rust|SQL|JavaScript|TypeScript|C\+\+|Ruby|Scala|Kotlin|Swift|PHP|Bash|Shell)\b/i, points: 1, label: "programming language" },
-    { pattern: /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Kafka|Redis|Spring|React|Angular|Vue|Node\.?js|Next\.?js|Terraform|Jenkins|PostgreSQL|MySQL|MongoDB|DynamoDB|Cassandra|Lambda|S3|EC2|ECS|EKS|SQS|SNS|CloudFormation|CloudWatch|Redshift|ElastiCache|Datadog|Splunk|GraphQL|REST|gRPC|RabbitMQ|Elasticsearch|Nginx|GitHub Actions|CircleCI|ArgoCD|Helm|Prometheus|Grafana|HikariCP|Hibernate|JUnit|Mockito|FastAPI|Django|Flask|Express)\b/i, points: 1, label: "technology name" },
+    { pattern: /\b(?:Java|Python|Go|Rust|SQL|JavaScript|TypeScript|C\+\+|Ruby|Scala|Kotlin|Swift|PHP|Bash|Shell|Apex|SOQL|SOSL|HTML|CSS|XML|JSON|C#|R|Perl|Dart|Lua)\b/i, points: 1, label: "programming language" },
+    { pattern: /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Kafka|Redis|Spring|React|Angular|Vue|Node\.?js|Next\.?js|Terraform|Jenkins|PostgreSQL|MySQL|MongoDB|DynamoDB|Cassandra|Lambda|S3|EC2|ECS|EKS|SQS|SNS|CloudFormation|CloudWatch|Redshift|ElastiCache|Datadog|Splunk|GraphQL|REST|gRPC|RabbitMQ|Elasticsearch|Nginx|GitHub Actions|CircleCI|ArgoCD|Helm|Prometheus|Grafana|HikariCP|Hibernate|JUnit|Mockito|FastAPI|Django|Flask|Express|Salesforce|Lightning|LWC|Visualforce|Copado|MuleSoft|Informatica|ServiceNow|SAP|Jira|Confluence|SFDX|Heroku|Aura|Data Loader|Postman|SonarQube|Snowflake|Databricks|Tableau|Power BI|Looker|Airflow|dbt|Fivetran|Segment|Twilio|Stripe|Okta|Auth0|Vercel|Netlify|Firebase|Supabase)\b/i, points: 1, label: "technology name" },
+    // Business value (capped at business_group_cap total)
+    { pattern: /\b\d[\d,.]*[KkMmBb]?\+?\s*(?:\w+\s+)?(?:users?|customers?|residents?|clients?|employees?|patients?|subscribers?|accounts?|merchants?|transactions?|requests?|members?|records?|orders?|vehicles?|devices?|endpoints?|applications?|services?|departments?|stores?|locations?|regions?|citizens?|constituents?|beneficiaries?|agencies?|organizations?|tenants?|partners?|vendors?|sites?|markets?|countries?|teams?|projects?)\b/i, points: 2, label: "scale/reach metric", group: "business" },
+    { pattern: /\b(?:compliance|regulatory|SOC\s*2|FedRAMP|HIPAA|PCI[\s-]?DSS|GDPR|SOX|ISO\s*27001|CCPA|CJIS|FISMA|NIST|ADA)\b/i, points: 1, label: "compliance/regulatory", group: "business" },
+    { pattern: /\b(?:stakeholder|executive|C-suite|CTO|CFO|CEO|CIO|CISO|VP|director|cross[\s-]?functional|cross[\s-]?team)\b/i, points: 1, label: "stakeholder engagement", group: "business" },
+    { pattern: /\b(?:revenue|adoption|retention|satisfaction|NPS|CSAT|SLA|uptime|availability|reliability|churn|conversion|engagement)\b/i, points: 1, label: "business outcome", group: "business" },
+    { pattern: /\b(?:enterprise[\s-]?wide|org[\s-]?wide|company[\s-]?wide|global|nationwide|organization[\s-]?wide)\b/i, points: 1, label: "strategic scope", group: "business" },
   ],
+  business_group_cap: 3,
   verb_check_points: 1,
-  no_metric_penalty: -2,
+  no_metric_penalty: 0,
   over_200_chars_penalty: -1,
   thresholds: {
     excellent: 7,
@@ -300,6 +323,7 @@ module.exports = {
   ATS_HEADERS,
   XYZ_PATTERNS,
   ACTION_VERBS,
+  WEAK_VERBS,
   QUALITY_SCORING,
   COMPETITOR_MAPS,
   CLOUD_ECOSYSTEMS,
