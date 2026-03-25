@@ -7,13 +7,91 @@
 //   GET  /models   — available model list
 //
 // Environment variables (set in Lambda console):
-//   OPENROUTER_API_KEY  — Your OpenRouter API key
+//   ANTHROPIC_API_KEY   — Your Anthropic API key
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
-const { buildSystemPrompt, buildUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { buildSystemPrompt, buildSystemPromptXL, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
+const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const crypto = require("crypto");
+
+const s3 = new S3Client({ region: "us-east-1" });
+const lambda = new LambdaClient({ region: "us-east-1" });
+const JOB_BUCKET = "resumex-526810258535";
+
+// ── JSON extraction (handles markdown fences, preamble text, etc.) ──
+
+function extractJSON(text) {
+  if (!text || !text.trim()) return null;
+
+  // 1. Try direct parse first (model returned clean JSON)
+  try { return JSON.parse(text.trim()); } catch {}
+
+  // 2. Strip markdown code fences (```json, ```JSON, ```, etc.)
+  const fenceMatch = text.match(/```(?:json|JSON)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) {
+    try { return JSON.parse(fenceMatch[1].trim()); } catch {}
+  }
+
+  // 3. Find first { and last } — extract the JSON object
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.substring(firstBrace, lastBrace + 1);
+    try { return JSON.parse(candidate); } catch {}
+  }
+
+  return null;
+}
+
+// ── Short-key expansion (maps compact LLM output keys → full keys) ──
+
+const SHORT_TO_FULL = {
+  jd: "parsed_jd",
+  rt: "role_title",
+  ind: "industry",
+  cp: "cloud_platform",
+  kt: "key_technologies",
+  rs: "required_skills",
+  ps: "professional_summary",
+  ts: "technical_skills",
+  lang: "Languages",
+  fw: "Frameworks & Libraries",
+  cloud: "Cloud & DevOps",
+  db: "Databases",
+  tools: "Tools & Practices",
+  exp: "experience",
+  co: "company",
+  ti: "title",
+  loc: "location",
+  sd: "start_date",
+  ed: "end_date",
+  b: "bullets",
+  ct: "contact",
+  n: "name",
+  em: "email",
+  ph: "phone",
+  li: "linkedin",
+  gh: "github",
+  edu: "education",
+  sc: "school",
+  dg: "degree",
+};
+
+function expandKeys(obj) {
+  if (Array.isArray(obj)) return obj.map(expandKeys);
+  if (obj && typeof obj === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[SHORT_TO_FULL[k] || k] = expandKeys(v);
+    }
+    return out;
+  }
+  return obj;
+}
 
 // ── Helpers ──
 
@@ -94,57 +172,68 @@ function getHeaders(event) {
 // ── Route: POST /analyze ──
 
 async function handleAnalyze(body) {
-  const { jd, customer, context, model: modelInput } = body;
+  const { jd, customer, context, model: modelInput, xlMode, companies } = body;
 
   if (!jd || jd.trim().length < 50) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
-  const systemPrompt = buildSystemPrompt();
-  const userMessage = buildUserMessage(jd, customer, context);
+  const systemPrompt = xlMode ? buildSystemPromptXL() : buildSystemPrompt();
+  const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
-  // Call OpenRouter
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: xlMode ? 16384 : 8192,
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
     }),
   });
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text();
-    console.error(`OpenRouter error (${orResponse.status}):`, errText);
-    return response(orResponse.status, {
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
       error: "LLM API error",
-      status: orResponse.status,
+      status: apiResponse.status,
       details: errText,
     });
   }
 
-  const data = await orResponse.json();
-  const responseText = data.choices?.[0]?.message?.content || "";
+  const data = await apiResponse.json();
 
-  // Parse JSON
-  const cleaned = responseText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-  let resumeData;
-  try {
-    resumeData = JSON.parse(cleaned);
-  } catch (e) {
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
     return response(422, {
-      error: "LLM returned invalid JSON. Try again or use claude-sonnet.",
-      raw_preview: cleaned.substring(0, 300),
+      error: data.error?.message || "Model returned an error.",
+    });
+  }
+
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
+  if (!responseText) {
+    return response(422, { error: "Model returned empty response. Try again." });
+  }
+
+  // Parse JSON and expand short keys to full keys
+  const resumeData = expandKeys(extractJSON(responseText));
+  if (!resumeData) {
+    const truncated = stopReason === "max_tokens";
+    return response(422, {
+      error: truncated
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
+      raw_preview: responseText.substring(0, 500),
     });
   }
 
@@ -160,16 +249,105 @@ async function handleAnalyze(body) {
   });
 }
 
+// ── Route: POST /optimize ──
+
+async function handleOptimize(body) {
+  const { resume, jd, context, model: modelInput, xlMode } = body;
+
+  if (!resume || resume.trim().length < 100) {
+    return response(400, { error: "Resume too short (need at least 100 characters)" });
+  }
+
+  if (!jd || jd.trim().length < 50) {
+    return response(400, { error: "Job description too short (need at least 50 characters)" });
+  }
+
+  const systemPrompt = xlMode ? buildOptimizeSystemPromptXL() : buildOptimizeSystemPrompt();
+  const userMessage = buildOptimizeUserMessage(resume, jd, context);
+  const model = resolveModel(modelInput);
+
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: xlMode ? 16384 : 8192,
+      system: systemPrompt,
+      messages: [
+        { role: "user", content: userMessage },
+      ],
+    }),
+  });
+
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
+      error: "LLM API error",
+      status: apiResponse.status,
+      details: errText,
+    });
+  }
+
+  const data = await apiResponse.json();
+
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
+    return response(422, {
+      error: data.error?.message || "Model returned an error.",
+    });
+  }
+
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
+  if (!responseText) {
+    return response(422, { error: "Model returned empty response. Try again." });
+  }
+
+  // Parse JSON and expand short keys to full keys
+  const resumeData = expandKeys(extractJSON(responseText));
+  if (!resumeData) {
+    const truncated = stopReason === "max_tokens";
+    return response(422, {
+      error: truncated
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
+      raw_preview: responseText.substring(0, 500),
+    });
+  }
+
+  const scoring = scoreResume(resumeData);
+  const timeline_warnings = validateTimeline(resumeData);
+
+  return response(200, {
+    resumeData,
+    scoring,
+    timeline_warnings,
+    model_used: data.model || model,
+    usage: data.usage || null,
+    mode: "optimize",
+  });
+}
+
 // ── Route: POST /build ──
 
 async function handleBuild(body) {
-  const { resumeData } = body;
+  const { resumeData, template, includeEducation, xlMode } = body;
 
   if (!resumeData || !resumeData.experience) {
     return response(400, { error: "Missing resumeData with experience array" });
   }
 
-  const buffer = await buildResume(resumeData, null);
+  const buffer = await buildResume(resumeData, null, {
+    template: template || "classic",
+    includeEducation: includeEducation !== false,
+    xlMode: !!xlMode,
+  });
   return binaryResponse(buffer, "Resume.docx");
 }
 
@@ -181,14 +359,269 @@ function handleModels() {
     models: Object.entries(config.API.models).map(([alias, id]) => ({
       alias,
       id,
-      provider: id.split("/")[0],
+      provider: "anthropic",
     })),
   });
 }
 
-// ── Main handler ──
+// ── Streaming handler (for Lambda Function URL with RESPONSE_STREAM) ──
+
+if (typeof awslambda !== "undefined") {
+  exports.streamHandler = awslambda.streamifyResponse(async (event, responseStream, _context) => {
+    const method = getMethod(event);
+    const path = getPath(event);
+    const headers = getHeaders(event);
+
+    // CORS preflight
+    if (method === "OPTIONS") {
+      responseStream = awslambda.HttpResponseStream.from(responseStream, {
+        statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+        },
+      });
+      responseStream.end();
+      return;
+    }
+
+    // Helper to send SSE error and close
+    function streamError(statusCode, error) {
+      responseStream = awslambda.HttpResponseStream.from(responseStream, {
+        statusCode,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+        },
+      });
+      responseStream.write(JSON.stringify({ error }));
+      responseStream.end();
+    }
+
+    // Auth
+    if (!checkAuth(headers)) {
+      return streamError(401, "Invalid passphrase");
+    }
+
+    const body = parseBody(event);
+
+    // Determine which mode (analyze or optimize)
+    let systemPrompt, userMessage, model, mode;
+
+    if (path.includes("/optimize") && method === "POST") {
+      const { resume, jd, context, model: modelInput } = body;
+      if (!resume || resume.trim().length < 100) return streamError(400, "Resume too short");
+      if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
+      systemPrompt = buildOptimizeSystemPrompt();
+      userMessage = buildOptimizeUserMessage(resume, jd, context);
+      model = resolveModel(modelInput);
+      mode = "optimize";
+    } else if (path.includes("/analyze") && method === "POST") {
+      const { jd, customer, context, model: modelInput, companies } = body;
+      if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
+      systemPrompt = buildSystemPrompt();
+      userMessage = buildUserMessage(jd, customer, context, companies);
+      model = resolveModel(modelInput);
+      mode = "generate";
+    } else {
+      return streamError(404, "Not found");
+    }
+
+    // Set up SSE response
+    responseStream = awslambda.HttpResponseStream.from(responseStream, {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+      },
+    });
+
+    // Send initial status
+    responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
+
+    // Call Anthropic Messages API with streaming
+    let apiResponse;
+    try {
+      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          system: systemPrompt,
+          messages: [
+            { role: "user", content: userMessage },
+          ],
+        }),
+      });
+    } catch (err) {
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "Failed to connect to AI service" })}\n\n`);
+      responseStream.end();
+      return;
+    }
+
+    if (!apiResponse.ok) {
+      const errText = await apiResponse.text();
+      console.error(`Anthropic stream error (${apiResponse.status}):`, errText);
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: apiResponse.status })}\n\n`);
+      responseStream.end();
+      return;
+    }
+
+    responseStream.write(`data: ${JSON.stringify({ type: "status", message: "AI is writing..." })}\n\n`);
+
+    // Read Anthropic SSE stream and forward content deltas
+    const reader = apiResponse.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE lines from Anthropic
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            responseStream.write(`data: ${JSON.stringify({ type: "content", delta: parsed.delta.text })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+
+    // Parse complete response and expand short keys to full keys
+    const resumeData = expandKeys(extractJSON(fullText));
+
+    if (resumeData) {
+      const scoring = scoreResume(resumeData);
+      const timeline_warnings = validateTimeline(resumeData);
+
+      responseStream.write(`data: ${JSON.stringify({
+        type: "complete",
+        resumeData,
+        scoring,
+        timeline_warnings,
+        model_used: model,
+        mode: mode === "optimize" ? "optimize" : undefined,
+      })}\n\n`);
+    } else {
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM returned invalid JSON. Try again or use a different model." })}\n\n`);
+    }
+
+    responseStream.write("data: [DONE]\n\n");
+    responseStream.end();
+  });
+}
+
+// ── Async job helpers ──
+
+async function writeJobResult(jobId, result) {
+  await s3.send(new PutObjectCommand({
+    Bucket: JOB_BUCKET,
+    Key: `jobs/${jobId}.json`,
+    Body: JSON.stringify(result),
+    ContentType: "application/json",
+  }));
+}
+
+async function readJobResult(jobId) {
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: JOB_BUCKET,
+      Key: `jobs/${jobId}.json`,
+    }));
+    const text = await obj.Body.transformToString();
+    return JSON.parse(text);
+  } catch (err) {
+    // Any S3 error means result isn't ready yet — return null so polling continues
+    return null;
+  }
+}
+
+async function startAsyncJob(body, route) {
+  const jobId = crypto.randomUUID();
+  const asyncPayload = { ...body, __jobId: jobId, __route: route };
+
+  try {
+    await lambda.send(new InvokeCommand({
+      FunctionName: "resume-generator",
+      InvocationType: "Event",
+      Payload: JSON.stringify({
+        __asyncJob: true,
+        body: JSON.stringify(asyncPayload),
+        headers: { "x-passphrase": process.env.SHARED_PASSPHRASE },
+      }),
+    }));
+  } catch (err) {
+    console.error("Failed to start async job:", err);
+    return response(500, { error: "Failed to start job. Try again." });
+  }
+
+  return response(202, { jobId, status: "processing" });
+}
+
+// ── Main handler (non-streaming, for API Gateway) ──
 
 exports.handler = async (event) => {
+  // ── Async job execution (invoked by Lambda async invoke) ──
+  if (event.__asyncJob) {
+    const body = JSON.parse(event.body);
+    const { __jobId: jobId, __route: route } = body;
+    try {
+      let result;
+      if (route === "optimize") {
+        result = await handleOptimize(body);
+      } else {
+        result = await handleAnalyze(body);
+      }
+      const resultBody = JSON.parse(result.body);
+
+      // Check if the handler returned a non-200 status (LLM API error, invalid JSON, etc.)
+      if (result.statusCode >= 400) {
+        await writeJobResult(jobId, {
+          status: "error",
+          error: resultBody.error || `Request failed (${result.statusCode})`,
+          details: resultBody.details || resultBody.raw_preview || undefined,
+        });
+      } else {
+        // Success — write result without spreading (avoids status field collision)
+        await writeJobResult(jobId, {
+          status: "complete",
+          resumeData: resultBody.resumeData,
+          scoring: resultBody.scoring,
+          timeline_warnings: resultBody.timeline_warnings,
+          model_used: resultBody.model_used,
+          usage: resultBody.usage,
+          mode: resultBody.mode,
+        });
+      }
+    } catch (err) {
+      console.error("Async job error:", err);
+      await writeJobResult(jobId, { status: "error", error: err.message });
+    }
+    return response(200, { ok: true });
+  }
+
   const method = getMethod(event);
   const path = getPath(event);
   const headers = getHeaders(event);
@@ -216,8 +649,22 @@ exports.handler = async (event) => {
   const body = parseBody(event);
 
   try {
+    // Poll for async job result
+    if (path === "/status" && method === "POST") {
+      const { jobId } = body;
+      if (!jobId) return response(400, { error: "Missing jobId" });
+      const result = await readJobResult(jobId);
+      if (!result) return response(200, { status: "processing" });
+      return response(200, result);
+    }
+
+    // Start async jobs for analyze/optimize (avoids 30s API GW timeout)
     if (path === "/analyze" && method === "POST") {
-      return await handleAnalyze(body);
+      return await startAsyncJob(body, "analyze");
+    }
+
+    if (path === "/optimize" && method === "POST") {
+      return await startAsyncJob(body, "optimize");
     }
 
     if (path === "/build" && method === "POST") {

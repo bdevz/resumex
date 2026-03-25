@@ -5,7 +5,7 @@
 # Prerequisites:
 #   - AWS CLI installed and configured (aws configure)
 #   - Node.js installed (for npm install)
-#   - An OpenRouter API key
+#   - An Anthropic API key
 #
 # Usage:
 #   bash deploy.sh
@@ -38,8 +38,8 @@ echo "  S3 Bucket: $S3_BUCKET"
 echo ""
 
 # ── Step 0: Collect secrets ──
-if [ -z "$OPENROUTER_API_KEY" ]; then
-  read -p "  OpenRouter API key (sk-or-...): " OPENROUTER_API_KEY
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+  read -p "  Anthropic API key (sk-ant-...): " ANTHROPIC_API_KEY
 fi
 
 if [ -z "$SHARED_PASSPHRASE" ]; then
@@ -101,7 +101,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --zip-file "fileb://lambda.zip" \
   --timeout 60 \
   --memory-size 512 \
-  --environment "Variables={OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
   --region "$REGION" \
   --query 'FunctionArn' --output text 2>/dev/null) || {
   echo "  Function exists, updating..."
@@ -118,7 +118,7 @@ LAMBDA_ARN=$(aws lambda create-function \
     --timeout 60 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
-    --environment "Variables={OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
     --region "$REGION" --output text --query 'FunctionArn' > /dev/null
 
   LAMBDA_ARN=$(aws lambda get-function \
@@ -201,9 +201,16 @@ aws s3 website "s3://$S3_BUCKET" --index-document index.html 2>/dev/null
 # Inject Lambda URL into frontend
 sed "s|%%LAMBDA_URL%%|${LAMBDA_URL}|g" frontend/index.html > /tmp/index.html
 
-# Upload
+# Upload HTML
 aws s3 cp /tmp/index.html "s3://$S3_BUCKET/index.html" \
   --content-type "text/html" --cache-control "max-age=300" --quiet
+
+# Upload template preview images
+if [ -d "frontend/templates" ]; then
+  aws s3 sync frontend/templates/ "s3://$S3_BUCKET/templates/" \
+    --content-type "image/jpeg" --cache-control "max-age=86400" --quiet
+  echo "  Uploaded $(ls frontend/templates/*.jpg 2>/dev/null | wc -l | tr -d ' ') template previews"
+fi
 
 S3_URL="http://$S3_BUCKET.s3-website-$REGION.amazonaws.com"
 echo "  S3 Website: $S3_URL"
@@ -238,7 +245,7 @@ echo "  To update later:"
 echo "    - Code changes:  bash deploy.sh"
 echo "    - Passphrase:    aws lambda update-function-configuration \\"
 echo "                       --function-name $FUNCTION_NAME \\"
-echo "                       --environment 'Variables={OPENROUTER_API_KEY=...,SHARED_PASSPHRASE=new-phrase}'"
+echo "                       --environment 'Variables={ANTHROPIC_API_KEY=...,SHARED_PASSPHRASE=new-phrase}'"
 echo ""
 echo "  To tear down:"
 echo "    aws lambda delete-function --function-name $FUNCTION_NAME"

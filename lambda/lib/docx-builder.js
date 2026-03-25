@@ -81,14 +81,34 @@ function createSectionHeader(title, tmpl, colorOverride) {
     spacing: dec.spacing,
   };
 
+  // Build border object from template config
+  const border = {};
   if (dec.bottomBorder) {
-    opts.border = {
-      bottom: {
-        style: BorderStyle.SINGLE,
-        color: colorOverride || dec.bottomBorder.color,
-        size: dec.bottomBorder.size,
-        space: 1,
-      },
+    border.bottom = {
+      style: BorderStyle.SINGLE,
+      color: colorOverride || dec.bottomBorder.color,
+      size: dec.bottomBorder.size,
+      space: 1,
+    };
+  }
+  if (dec.topBorder) {
+    border.top = {
+      style: BorderStyle.SINGLE,
+      color: colorOverride || dec.topBorder.color,
+      size: dec.topBorder.size,
+      space: 1,
+    };
+  }
+  if (Object.keys(border).length > 0) {
+    opts.border = border;
+  }
+
+  // Shading (colored background bar on section headers)
+  if (dec.shading) {
+    opts.shading = {
+      type: ShadingType.CLEAR,
+      fill: dec.shading.fill,
+      color: "auto",
     };
   }
 

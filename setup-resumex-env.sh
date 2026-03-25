@@ -17,8 +17,8 @@ echo "Lambda Function: $FUNCTION_NAME"
 echo ""
 
 # Collect environment variables
-if [ -z "$OPENROUTER_API_KEY" ]; then
-  read -p "OpenRouter API Key (sk-or-...): " OPENROUTER_API_KEY
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+  read -p "Anthropic API Key (sk-ant-...): " ANTHROPIC_API_KEY
 fi
 
 if [ -z "$SHARED_PASSPHRASE" ]; then
@@ -33,7 +33,7 @@ aws lambda update-function-configuration \
   --function-name "$FUNCTION_NAME" \
   --environment "Variables={
     NODE_ENV=production,
-    OPENROUTER_API_KEY=$OPENROUTER_API_KEY,
+    ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,
     SHARED_PASSPHRASE=$SHARED_PASSPHRASE
   }" \
   --output table \
