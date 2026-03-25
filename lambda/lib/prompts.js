@@ -5,15 +5,15 @@
 const config = require("./config");
 
 function buildSystemPrompt() {
-  return `You are a resume generator that creates ATS-optimized resumes using the Google XYZ formula.
+  return `You are a resume generator that creates ATS-optimized, human-readable resumes.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
 2. Use the exact JSON schema provided below
 3. Generate realistic work history with 3-4 companies over 6-7 years
-4. Each bullet must follow Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
-5. Include specific metrics, technologies, and quantifiable results
-6. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+4. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created
+5. NEVER use weak/passive verbs: Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood
+6. Include specific technologies and quantifiable results where natural
 7. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
@@ -58,11 +58,43 @@ WORK HISTORY GUIDELINES:
 - Timeline must be realistic (no gaps, no overlaps)
 
 BULLET REQUIREMENTS:
-- Start with strong action verb
+- Start with a strong, past-tense action verb (Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created)
+- NEVER start with weak/passive verbs: Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed
 - Include specific technologies mentioned in JD
-- Add quantifiable metrics (%, $, time saved, team size)
-- Keep under 200 characters
+- Do NOT end bullet points with periods
+- Keep bullets to 1-2 lines (under 200 characters)
 - Focus on achievements, not responsibilities
+- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
+- Use digits instead of spelling out numbers (8 not "eight")
+
+WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
+Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
+- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
+- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
+- Some bullets: Start with the impact/scale, then explain how
+- Some bullets: Lead with the technology choice, then show the outcome
+CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume — when EVERY bullet has a percentage or dollar amount.
+- Maximum 4 bullets per role should have hard metrics (%, $, from-X-to-Y comparisons)
+- The remaining bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons
+- Instead, those bullets should describe WHAT you built, HOW it worked, or WHY it mattered — in plain language
+
+Example of a GOOD non-metric bullet: "Designed a caching layer using Redis to serve frequently accessed legal documents without hitting the database on every request"
+Example of a GOOD non-metric bullet: "Built an internal CLI tool that automated sandbox provisioning, replacing a 15-step manual process the team had been doing since launch"
+Example of a BAD pattern (every bullet has numbers): "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms..." — this reads like AI slop.
+
+A resume that reads like a human wrote it stands out.
+
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+Hiring managers spend 6 seconds scanning a resume. The first 2 bullets of each role are the ONLY ones most will read.
+- Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE (how many users/systems/teams), IMPACT (business outcome), and LEADERSHIP
+- Bullet 2 MUST answer "what business problem did they solve?" — compliance, cost savings, reliability, customer satisfaction
+- Bullets 3-4: technical depth — architecture decisions, technology migrations, performance gains
+- Remaining bullets: supporting achievements, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+- 2-3 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes (e.g., "serving 4.2M residents", "achieving FedRAMP compliance across 12 departments")
+- 2-3 bullets: Technical achievement — performance gains, architecture, system design (e.g., "reducing latency from 6.2s to 1.4s")
+- 1-2 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management (e.g., "partnering with VP of Engineering", "leading a team of 8")
 
 COMPANY & DOMAIN CONTEXT:
 - When specific companies are provided, use your knowledge of that company to generate
@@ -89,30 +121,10 @@ CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
 2. Use the exact JSON schema provided below
 3. Generate realistic work history with 3-4 companies over 6-7 years
-4. Each bullet must follow Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
-5. EVERY bullet MUST include ALL THREE: (a) strong action verb, (b) specific technology/framework name, (c) quantifiable metric
-6. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
-7. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. For example: RAG (2023), LangChain (2022), Generative AI (2022) — do NOT put these in roles starting before those years. See the full TECHNOLOGY TIMELINE below.
-
-QUALITY REQUIREMENT — EVERY BULLET MUST SCORE 5+/7:
-Each bullet is scored on these criteria (aim for 5+ total points):
-  - Strong action verb (Architected, Built, Engineered, etc.): +1 point
-  - Programming language name (Java, Python, Go, etc.): +1 point
-  - Technology/framework name (Kubernetes, Kafka, Spring Boot, etc.): +1 point
-  - Percentage improvement (e.g., "by 40%"): +2 points
-  - Dollar amount (e.g., "$2M savings"): +2 points
-  - Baseline comparison (e.g., "from 500ms to 50ms"): +2 points
-  - Team size (e.g., "team of 8"): +1 point
-
-To score 5+, EVERY bullet MUST have:
-  1. A strong action verb (Architected, Engineered, Optimized, etc.)
-  2. A specific technology AND a programming language name (e.g., "using Java and Spring Boot", "with Python and Apache Kafka")
-  3. A quantifiable metric: percentage (e.g., "by 40%"), dollar amount (e.g., "$500K"), OR baseline comparison (e.g., "from 5s to 200ms")
-
-Example of a 7-point bullet: "Architected a distributed caching layer using Java and Redis, reducing API latency from 800ms to 120ms and cutting infrastructure costs by $200K annually."
-Example of a 5-point bullet: "Engineered real-time data pipelines using Python and Apache Kafka, improving data processing throughput by 60%."
-
-Bullets scoring below 5 are UNACCEPTABLE — rewrite until they meet the criteria.
+4. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
+5. EVERY bullet MUST include: (a) strong action verb, (b) specific technology/framework name
+6. Most bullets should include a quantifiable metric, but not ALL — see WRITING STYLE below
+7. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. See TECHNOLOGY TIMELINE below.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
 {
@@ -156,13 +168,40 @@ WORK HISTORY GUIDELINES:
 - Timeline must be realistic (no gaps, no overlaps)
 
 BULLET REQUIREMENTS:
-- Start with strong action verb
-- Include specific technologies mentioned in JD in EVERY bullet
-- Add quantifiable metrics (%, $, time saved, team size) in EVERY bullet
-- Keep under 250 characters
+- Start with a strong, past-tense action verb (Built, Designed, Developed, Led, Reduced, Improved)
+- Include specific technologies mentioned in JD
+- Do NOT end bullet points with periods
+- Keep bullets to 1-2 lines (under 250 characters for XL mode)
 - Focus on achievements, not responsibilities
-- Maximize technology keyword density — every bullet references a specific tech, framework, or methodology
-- NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below). If a JD keyword like "RAG" or "LangChain" didn't exist during a role's dates, use an alternative technology that DID exist at that time
+- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
+- Use digits instead of spelling out numbers
+- NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
+
+WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
+Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
+- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
+- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
+- Some bullets: Start with the impact/scale, then explain how
+- Some bullets: Lead with the technology choice, then show the outcome
+CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume.
+With 10-15 bullets per role, maximum 5 should have hard metrics (%, $, from-X-to-Y).
+The remaining 5-10 bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons.
+Instead, describe WHAT you built, HOW it worked, or WHY it mattered — in plain language.
+A resume that reads like a human wrote it stands out.
+
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+The first 3 bullets of each role are the ONLY ones most hiring managers will read.
+- Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
+- Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
+- Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
+- Bullet 3: a strong technical achievement with clear metrics
+- Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+With 10-15 bullets, mix these types:
+- 3-4 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 4-5 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 2-3 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 PROFESSIONAL SUMMARY REQUIREMENTS:
 - Write 5-8 sentences covering experience breadth, key technologies, cloud platforms, methodologies, and domain expertise
@@ -241,9 +280,16 @@ function scoreResume(resumeData) {
         grade: score.grade,
         breakdown: score.breakdown
       });
-      
+
       totalScore += score.total;
       bulletCount++;
+    }
+
+    // Check if first 2 bullets are strong (skimmability warning)
+    const firstTwo = companyResult.bullets.slice(0, 2);
+    const weakLeaders = firstTwo.filter(b => b.score < config.QUALITY_SCORING.thresholds.good);
+    if (weakLeaders.length > 0) {
+      companyResult.ordering_warning = `First ${weakLeaders.length} bullet(s) score below "Good" — consider reordering to put your strongest achievements first`;
     }
 
     results.push(companyResult);
@@ -260,33 +306,44 @@ function scoreResume(resumeData) {
 
 function scoreBullet(bullet) {
   let score = 0;
+  let bizScore = 0;
   const breakdown = [];
 
   // Check for action verb at start
+  const firstWord = bullet.split(/\s+/)[0].toLowerCase();
+  const isWeakVerb = config.WEAK_VERBS.some(v => firstWord === v.toLowerCase());
   const startsWithActionVerb = Object.values(config.ACTION_VERBS)
     .flat()
     .some(verb => bullet.toLowerCase().startsWith(verb.toLowerCase()));
-  
-  if (startsWithActionVerb) {
+
+  if (isWeakVerb) {
+    score -= 1;
+    breakdown.push("Weak action verb (penalty)");
+  } else if (startsWithActionVerb) {
     score += config.QUALITY_SCORING.verb_check_points;
     breakdown.push("Strong action verb");
   }
 
-  // Check scoring rules
+  // Check scoring rules — separate business group
   for (const rule of config.QUALITY_SCORING.rules) {
     if (rule.pattern.test(bullet)) {
-      score += rule.points;
+      if (rule.group === "business") {
+        bizScore += rule.points;
+      } else {
+        score += rule.points;
+      }
       breakdown.push(rule.label);
     }
   }
 
-  // Penalties
-  if (!/\d/.test(bullet)) {
-    score += config.QUALITY_SCORING.no_metric_penalty;
-    breakdown.push("No metrics (penalty)");
-  }
+  // Apply business group cap to prevent inflation
+  const cap = config.QUALITY_SCORING.business_group_cap || 3;
+  const cappedBiz = Math.min(bizScore, cap);
+  score += cappedBiz;
 
-  if (bullet.length > 200) {
+  // Note: no penalty for missing metrics — not every bullet needs numbers
+
+  if (bullet.length > 220) {
     score += config.QUALITY_SCORING.over_200_chars_penalty;
     breakdown.push("Too long (penalty)");
   }
@@ -382,12 +439,12 @@ CRITICAL RULES:
 4. Do NOT invent new companies, roles, or change employment dates
 5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
 6. EXTRACT education details (schools, degrees, dates, locations) from the resume
-7. REWRITE bullet points using Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
-8. ADD quantifiable metrics to every bullet (%, $, time saved, team size, scale)
+7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
+8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role
 11. REORDER technical skills to prioritize what the JD asks for
-12. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
+12. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
 13. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
@@ -441,12 +498,35 @@ Use these SHORT KEYS in your JSON response (saves tokens):
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 6-8 bullets
-- Each bullet must include at least one quantifiable metric
-- Keep bullets under 200 characters
-- If the original bullet lacks a metric, add a realistic one based on context
+- Do NOT end bullet points with periods
+- Keep bullets to 1-2 lines (under 200 characters)
+- If the original bullet lacks a metric, add a realistic one based on context — but NOT every bullet needs a number
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
+- NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood). Use direct verbs (Built, Designed, Developed, Led, Reduced, Improved)
+- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
+
+WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
+Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
+- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
+- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
+- Some bullets: Start with the impact/scale, then explain how
+- Some bullets: Lead with the technology choice, then show the outcome
+- 3-4 bullets per role should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
+A resume that reads like a human wrote it stands out.
+
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+When rewriting bullets, place the strongest rewritten bullets FIRST in each role.
+- Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE, IMPACT, and LEADERSHIP
+- Bullet 2 MUST answer "what business problem did they solve?" — compliance, cost savings, reliability, customer satisfaction
+- Bullets 3-4: technical depth — architecture decisions, technology migrations, performance gains
+- Remaining bullets: supporting achievements, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+- 2-3 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 2-3 bullets: Technical achievement — performance gains, architecture, system design
+- 1-2 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
@@ -464,33 +544,13 @@ CRITICAL RULES:
 4. Do NOT invent new companies, roles, or change employment dates
 5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
 6. EXTRACT education details (schools, degrees, dates, locations) from the resume
-7. REWRITE bullet points using Google XYZ formula: "Accomplished [X] by doing [Y], resulting in [Z]"
-8. ADD quantifiable metrics to EVERY bullet (%, $, time saved, team size, scale)
+7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
+8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role — make it 5-8 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
-12. Use strong action verbs: ${config.ACTION_VERBS.technical.slice(0, 10).join(", ")}
-13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. For example: RAG (2023), LangChain (2022), Generative AI (2022) — do NOT put these in roles starting before those years. See the full TECHNOLOGY TIMELINE below.
-
-QUALITY REQUIREMENT — EVERY BULLET MUST SCORE 5+/7:
-Each bullet is scored on these criteria (aim for 5+ total points):
-  - Strong action verb (Architected, Built, Engineered, etc.): +1 point
-  - Programming language name (Java, Python, Go, etc.): +1 point
-  - Technology/framework name (Kubernetes, Kafka, Spring Boot, etc.): +1 point
-  - Percentage improvement (e.g., "by 40%"): +2 points
-  - Dollar amount (e.g., "$2M savings"): +2 points
-  - Baseline comparison (e.g., "from 500ms to 50ms"): +2 points
-  - Team size (e.g., "team of 8"): +1 point
-
-To score 5+, EVERY bullet MUST have:
-  1. A strong action verb
-  2. A specific technology AND a programming language name
-  3. A quantifiable metric: percentage, dollar amount, OR baseline comparison
-
-Example 7-point bullet: "Architected a distributed caching layer using Java and Redis, reducing API latency from 800ms to 120ms and cutting infrastructure costs by $200K annually."
-Example 5-point bullet: "Engineered real-time data pipelines using Python and Apache Kafka, improving data processing throughput by 60%."
-
-Bullets scoring below 5 are UNACCEPTABLE — rewrite until they meet the criteria.
+12. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
+13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT. See TECHNOLOGY TIMELINE below.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
 {
@@ -543,14 +603,36 @@ Use these SHORT KEYS in your JSON response (saves tokens):
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 10-15 detailed bullets
-- If original has fewer than 10 bullets per role, ADD more bullets following the XYZ pattern with JD keywords
-- Each bullet must include at least one quantifiable metric AND at least one technology name
+- If original has fewer than 10 bullets per role, ADD more bullets with JD keywords
+- Do NOT end bullet points with periods
 - Keep bullets under 250 characters
-- If the original bullet lacks a metric, add a realistic one based on context
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
+- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
+
+WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
+Do NOT write every bullet in the same formula pattern. Mix sentence structures naturally:
+- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
+- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
+- Some bullets: Start with the impact/scale, then explain how
+- Some bullets: Lead with the technology choice, then show the outcome
+With 10-15 bullets per role, 5-7 should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
+
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+Place the strongest rewritten bullets FIRST in each role.
+- Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
+- Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
+- Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
+- Bullet 3: a strong technical achievement with clear metrics
+- Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+With 10-15 bullets, mix these types:
+- 3-4 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 4-5 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 2-3 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}

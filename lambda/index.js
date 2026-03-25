@@ -7,7 +7,8 @@
 //   GET  /models   — available model list
 //
 // Environment variables (set in Lambda console):
-//   OPENROUTER_API_KEY  — Your OpenRouter API key
+//   ANTHROPIC_API_KEY   — Your Anthropic API key (preferred, uses Claude directly)
+//   OPENROUTER_API_KEY  — Your OpenRouter API key (fallback, routes through OpenRouter)
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
@@ -93,6 +94,78 @@ function expandKeys(obj) {
   return obj;
 }
 
+// ── LLM API call (Anthropic direct or OpenRouter) ──
+
+function useAnthropic() {
+  return !!process.env.ANTHROPIC_API_KEY;
+}
+
+async function callLLM({ model, max_tokens, messages, stream }) {
+  if (useAnthropic()) {
+    // Direct Anthropic Messages API
+    // Separate system message from user/assistant messages
+    const systemMsg = messages.find(m => m.role === "system");
+    const chatMessages = messages.filter(m => m.role !== "system");
+
+    const body = {
+      model,
+      max_tokens,
+      messages: chatMessages,
+    };
+    if (systemMsg) body.system = systemMsg.content;
+    if (stream) body.stream = true;
+
+    return fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // OpenRouter (existing path)
+  const body = {
+    model,
+    max_tokens,
+    response_format: { type: "json_object" },
+    messages,
+  };
+  if (stream) body.stream = true;
+
+  return fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "X-Title": "Resume Generator",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function parseLLMResponse(data) {
+  if (useAnthropic()) {
+    // Anthropic Messages API response format
+    const text = data.content?.[0]?.text || "";
+    const stopReason = data.stop_reason; // "end_turn", "max_tokens"
+    return { text, finishReason: stopReason === "max_tokens" ? "length" : stopReason, model: data.model, usage: data.usage };
+  }
+  // OpenRouter response format
+  const text = data.choices?.[0]?.message?.content || "";
+  const finishReason = data.choices?.[0]?.finish_reason;
+  return { text, finishReason, model: data.model, usage: data.usage };
+}
+
+function parseLLMError(data) {
+  if (useAnthropic()) {
+    return data.error?.message || null;
+  }
+  return data.error?.message || (data.error ? JSON.stringify(data.error) : null);
+}
+
 // ── Helpers ──
 
 function response(statusCode, body, extraHeaders = {}) {
@@ -130,8 +203,29 @@ function checkAuth(headers) {
   return passphrase && passphrase === process.env.SHARED_PASSPHRASE;
 }
 
+// Anthropic model aliases → direct Anthropic model IDs
+const ANTHROPIC_MODELS = {
+  "claude-opus-4.6": "claude-opus-4-6",
+  "claude-opus-4.5": "claude-opus-4-5-20251101",
+  "claude-sonnet-4.6": "claude-sonnet-4-6",
+  "claude-sonnet-4.5": "claude-sonnet-4-5-20250929",
+  "claude-haiku-4.5": "claude-haiku-4-5-20251001",
+};
+
 function resolveModel(modelInput) {
   if (!modelInput) return config.API.default_model;
+
+  if (useAnthropic()) {
+    // When using Anthropic directly, resolve to Anthropic model IDs
+    if (ANTHROPIC_MODELS[modelInput]) return ANTHROPIC_MODELS[modelInput];
+    // If it looks like an Anthropic model ID already (e.g. "claude-opus-4-20250514"), use it
+    if (modelInput.startsWith("claude-")) return modelInput;
+    // Non-Claude model requested — fall back to default (can't use GPT/Gemini/etc. via Anthropic)
+    console.warn(`Model "${modelInput}" not available via Anthropic API, using default: ${config.API.default_model}`);
+    return config.API.default_model;
+  }
+
+  // OpenRouter path
   if (config.API.models[modelInput]) return config.API.models[modelInput];
   return modelInput;
 }
@@ -182,47 +276,38 @@ async function handleAnalyze(body) {
   const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
-  // Call OpenRouter
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: xlMode ? 16384 : 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
+  // Call LLM (Anthropic direct or OpenRouter)
+  const llmResponse = await callLLM({
+    model,
+    max_tokens: xlMode ? 16384 : 8192,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
   });
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text();
-    console.error(`OpenRouter error (${orResponse.status}):`, errText);
-    return response(orResponse.status, {
+  if (!llmResponse.ok) {
+    const errText = await llmResponse.text();
+    console.error(`LLM API error (${llmResponse.status}):`, errText);
+    return response(llmResponse.status, {
       error: "LLM API error",
-      status: orResponse.status,
+      status: llmResponse.status,
       details: errText,
     });
   }
 
-  const data = await orResponse.json();
+  const data = await llmResponse.json();
 
   // Check for API-level errors (model unavailable, content filtered, etc.)
-  if (data.error) {
-    console.error("OpenRouter API error:", JSON.stringify(data.error));
+  const apiError = parseLLMError(data);
+  if (apiError) {
+    console.error("LLM API error:", apiError);
     return response(422, {
-      error: data.error.message || "Model returned an error. Try a different model.",
+      error: apiError || "Model returned an error. Try a different model.",
     });
   }
 
-  const responseText = data.choices?.[0]?.message?.content || "";
-  const finishReason = data.choices?.[0]?.finish_reason;
+  const { text: responseText, finishReason, model: usedModel, usage } = parseLLMResponse(data);
   if (!responseText) {
     return response(422, { error: "Model returned empty response. Try again or use a different model." });
   }
@@ -246,8 +331,8 @@ async function handleAnalyze(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: data.model || model,
-    usage: data.usage || null,
+    model_used: usedModel || model,
+    usage: usage || null,
   });
 }
 
@@ -268,46 +353,37 @@ async function handleOptimize(body) {
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
-  // Call OpenRouter
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: xlMode ? 16384 : 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
+  // Call LLM (Anthropic direct or OpenRouter)
+  const llmResponse = await callLLM({
+    model,
+    max_tokens: xlMode ? 16384 : 8192,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
   });
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text();
-    console.error(`OpenRouter error (${orResponse.status}):`, errText);
-    return response(orResponse.status, {
+  if (!llmResponse.ok) {
+    const errText = await llmResponse.text();
+    console.error(`LLM API error (${llmResponse.status}):`, errText);
+    return response(llmResponse.status, {
       error: "LLM API error",
-      status: orResponse.status,
+      status: llmResponse.status,
       details: errText,
     });
   }
 
-  const data = await orResponse.json();
+  const data = await llmResponse.json();
 
-  if (data.error) {
-    console.error("OpenRouter API error:", JSON.stringify(data.error));
+  const apiError = parseLLMError(data);
+  if (apiError) {
+    console.error("LLM API error:", apiError);
     return response(422, {
-      error: data.error.message || "Model returned an error. Try a different model.",
+      error: apiError || "Model returned an error. Try a different model.",
     });
   }
 
-  const responseText = data.choices?.[0]?.message?.content || "";
-  const finishReason = data.choices?.[0]?.finish_reason;
+  const { text: responseText, finishReason, model: usedModel, usage } = parseLLMResponse(data);
   if (!responseText) {
     return response(422, { error: "Model returned empty response. Try again or use a different model." });
   }
@@ -331,8 +407,8 @@ async function handleOptimize(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: data.model || model,
-    usage: data.usage || null,
+    model_used: usedModel || model,
+    usage: usage || null,
     mode: "optimize",
   });
 }
@@ -357,6 +433,18 @@ async function handleBuild(body) {
 // ── Route: GET /models ──
 
 function handleModels() {
+  if (useAnthropic()) {
+    // Only Claude models available when using Anthropic API directly
+    return response(200, {
+      default: "claude-opus-4.6",
+      models: Object.entries(ANTHROPIC_MODELS).map(([alias, id]) => ({
+        alias,
+        id,
+        provider: "anthropic",
+      })),
+    });
+  }
+
   return response(200, {
     default: "claude-sonnet",
     models: Object.entries(config.API.models).map(([alias, id]) => ({
@@ -446,26 +534,17 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call OpenRouter with streaming
-    let orResponse;
+    // Call LLM with streaming
+    let llmStreamResponse;
     try {
-      orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "X-Title": "Resume Generator",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 4096,
-          stream: true,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-        }),
+      llmStreamResponse = await callLLM({
+        model,
+        max_tokens: 4096,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
       });
     } catch (err) {
       responseStream.write(`data: ${JSON.stringify({ type: "error", error: "Failed to connect to AI service" })}\n\n`);
@@ -473,18 +552,18 @@ if (typeof awslambda !== "undefined") {
       return;
     }
 
-    if (!orResponse.ok) {
-      const errText = await orResponse.text();
-      console.error(`OpenRouter stream error (${orResponse.status}):`, errText);
-      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: orResponse.status })}\n\n`);
+    if (!llmStreamResponse.ok) {
+      const errText = await llmStreamResponse.text();
+      console.error(`LLM stream error (${llmStreamResponse.status}):`, errText);
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: llmStreamResponse.status })}\n\n`);
       responseStream.end();
       return;
     }
 
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "AI is writing..." })}\n\n`);
 
-    // Read streaming response from OpenRouter and forward chunks
-    const reader = orResponse.body.getReader();
+    // Read streaming response and forward chunks
+    const reader = llmStreamResponse.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
     let buffer = "";
@@ -495,18 +574,21 @@ if (typeof awslambda !== "undefined") {
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete SSE lines from OpenRouter
       const lines = buffer.split("\n");
       buffer = lines.pop(); // Keep incomplete line in buffer
 
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
+        const eventData = line.slice(6).trim();
+        if (eventData === "[DONE]") continue;
 
         try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content || "";
+          const parsed = JSON.parse(eventData);
+          // Anthropic SSE: content_block_delta with delta.text
+          // OpenRouter SSE: choices[0].delta.content
+          const delta = useAnthropic()
+            ? (parsed.delta?.text || "")
+            : (parsed.choices?.[0]?.delta?.content || "");
           if (delta) {
             fullText += delta;
             responseStream.write(`data: ${JSON.stringify({ type: "content", delta })}\n\n`);

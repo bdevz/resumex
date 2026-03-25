@@ -275,7 +275,7 @@ function createEducationSection(education, tmpl, colorOverride) {
   // Dynamic education array (from optimize mode or LLM output)
   if (education && Array.isArray(education) && education.length > 0) {
     for (const edu of education) {
-      const dates = [edu.start_date, edu.end_date].filter(Boolean).join(" \u2014 ");
+      const dates = edu.graduated || edu.end_date || "";
       paragraphs.push(
         new Paragraph({
           tabStops: [{ type: TabStopType.RIGHT, position: rightTab }],
@@ -336,7 +336,7 @@ function createEducationSection(education, tmpl, colorOverride) {
             color: colorOverride || tmpl.colors.primary,
           }),
           new TextRun({
-            text: `\t${edu.start} \u2014 ${edu.end}`,
+            text: `\t${edu.graduated || edu.end}`,
             font: fEdu.face,
             size: fEdu.size,
             color: textColor,
@@ -372,23 +372,23 @@ function buildSingleColumnDoc(resumeData, contact, education, tmpl) {
     createNameHeader(contact, tmpl),
     createContactLine(contact, tmpl),
     createSpacing(),
-    createSectionHeader("Professional Summary", tmpl),
+    createSectionHeader(config.ATS_HEADERS.summary, tmpl),
     createParagraph(
       resumeData.professional_summary || "Experienced software engineer with expertise in full-stack development.",
       tmpl
     ),
     createSpacing(),
-    createSectionHeader("Technical Skills", tmpl),
+    createSectionHeader(config.ATS_HEADERS.skills, tmpl),
     ...createSkillsSection(resumeData.technical_skills || {}, tmpl),
     createSpacing(),
-    createSectionHeader("Professional Experience", tmpl),
+    createSectionHeader(config.ATS_HEADERS.experience, tmpl),
     ...createExperienceSection(resumeData.experience || [], tmpl),
   ];
 
   if (education) {
     children.push(
       createSpacing(),
-      createSectionHeader("Education", tmpl),
+      createSectionHeader(config.ATS_HEADERS.education, tmpl),
       ...createEducationSection(education, tmpl),
     );
   }
@@ -423,7 +423,7 @@ function buildSectionContent(sections, resumeData, contact, education, tmpl, col
         children.push(createSpacing());
         break;
       case "summary":
-        children.push(createSectionHeader("Professional Summary", tmpl, colorOverride));
+        children.push(createSectionHeader(config.ATS_HEADERS.summary, tmpl, colorOverride));
         children.push(createParagraph(
           resumeData.professional_summary || "Experienced software engineer with expertise in full-stack development.",
           tmpl, colorOverride
@@ -431,18 +431,18 @@ function buildSectionContent(sections, resumeData, contact, education, tmpl, col
         children.push(createSpacing());
         break;
       case "skills":
-        children.push(createSectionHeader("Technical Skills", tmpl, colorOverride));
+        children.push(createSectionHeader(config.ATS_HEADERS.skills, tmpl, colorOverride));
         children.push(...createSkillsSection(resumeData.technical_skills || {}, tmpl, colorOverride));
         children.push(createSpacing());
         break;
       case "experience":
-        children.push(createSectionHeader("Professional Experience", tmpl, colorOverride));
+        children.push(createSectionHeader(config.ATS_HEADERS.experience, tmpl, colorOverride));
         children.push(...createExperienceSection(resumeData.experience || [], tmpl, colorOverride));
         children.push(createSpacing());
         break;
       case "education":
         if (education) {
-          children.push(createSectionHeader("Education", tmpl, colorOverride));
+          children.push(createSectionHeader(config.ATS_HEADERS.education, tmpl, colorOverride));
           children.push(...createEducationSection(education, tmpl, colorOverride));
           children.push(createSpacing());
         }

@@ -38,8 +38,12 @@ echo "  S3 Bucket: $S3_BUCKET"
 echo ""
 
 # ── Step 0: Collect secrets ──
-if [ -z "$OPENROUTER_API_KEY" ]; then
-  read -p "  OpenRouter API key (sk-or-...): " OPENROUTER_API_KEY
+# Prefer Anthropic API key (direct Claude access); fall back to OpenRouter
+if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+  read -p "  Anthropic API key (sk-ant-...) or leave blank for OpenRouter: " ANTHROPIC_API_KEY
+  if [ -z "$ANTHROPIC_API_KEY" ]; then
+    read -p "  OpenRouter API key (sk-or-...): " OPENROUTER_API_KEY
+  fi
 fi
 
 if [ -z "$SHARED_PASSPHRASE" ]; then
@@ -101,7 +105,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --zip-file "fileb://lambda.zip" \
   --timeout 60 \
   --memory-size 512 \
-  --environment "Variables={OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
   --region "$REGION" \
   --query 'FunctionArn' --output text 2>/dev/null) || {
   echo "  Function exists, updating..."
@@ -118,7 +122,7 @@ LAMBDA_ARN=$(aws lambda create-function \
     --timeout 60 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
-    --environment "Variables={OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,OPENROUTER_API_KEY=$OPENROUTER_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
     --region "$REGION" --output text --query 'FunctionArn' > /dev/null
 
   LAMBDA_ARN=$(aws lambda get-function \
