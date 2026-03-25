@@ -23,7 +23,7 @@ backend:
   memory: 512
   environment_variables:
     NODE_ENV: production
-    # OPENROUTER_API_KEY: "your-openrouter-api-key-here"  # Set this during deployment
+    # ANTHROPIC_API_KEY: "your-anthropic-api-key-here"  # Set this during deployment
     # SHARED_PASSPHRASE: "your-team-passphrase-here"      # Set this during deployment
 
 deployment:

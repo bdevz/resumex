@@ -7,8 +7,7 @@
 //   GET  /models   — available model list
 //
 // Environment variables (set in Lambda console):
-//   ANTHROPIC_API_KEY   — Your Anthropic API key (preferred, uses Claude directly)
-//   OPENROUTER_API_KEY  — Your OpenRouter API key (fallback, routes through OpenRouter)
+//   ANTHROPIC_API_KEY   — Your Anthropic API key
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
@@ -94,78 +93,6 @@ function expandKeys(obj) {
   return obj;
 }
 
-// ── LLM API call (Anthropic direct or OpenRouter) ──
-
-function useAnthropic() {
-  return !!process.env.ANTHROPIC_API_KEY;
-}
-
-async function callLLM({ model, max_tokens, messages, stream }) {
-  if (useAnthropic()) {
-    // Direct Anthropic Messages API
-    // Separate system message from user/assistant messages
-    const systemMsg = messages.find(m => m.role === "system");
-    const chatMessages = messages.filter(m => m.role !== "system");
-
-    const body = {
-      model,
-      max_tokens,
-      messages: chatMessages,
-    };
-    if (systemMsg) body.system = systemMsg.content;
-    if (stream) body.stream = true;
-
-    return fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    });
-  }
-
-  // OpenRouter (existing path)
-  const body = {
-    model,
-    max_tokens,
-    response_format: { type: "json_object" },
-    messages,
-  };
-  if (stream) body.stream = true;
-
-  return fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "X-Title": "Resume Generator",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-function parseLLMResponse(data) {
-  if (useAnthropic()) {
-    // Anthropic Messages API response format
-    const text = data.content?.[0]?.text || "";
-    const stopReason = data.stop_reason; // "end_turn", "max_tokens"
-    return { text, finishReason: stopReason === "max_tokens" ? "length" : stopReason, model: data.model, usage: data.usage };
-  }
-  // OpenRouter response format
-  const text = data.choices?.[0]?.message?.content || "";
-  const finishReason = data.choices?.[0]?.finish_reason;
-  return { text, finishReason, model: data.model, usage: data.usage };
-}
-
-function parseLLMError(data) {
-  if (useAnthropic()) {
-    return data.error?.message || null;
-  }
-  return data.error?.message || (data.error ? JSON.stringify(data.error) : null);
-}
-
 // ── Helpers ──
 
 function response(statusCode, body, extraHeaders = {}) {
@@ -214,20 +141,10 @@ const ANTHROPIC_MODELS = {
 
 function resolveModel(modelInput) {
   if (!modelInput) return config.API.default_model;
-
-  if (useAnthropic()) {
-    // When using Anthropic directly, resolve to Anthropic model IDs
-    if (ANTHROPIC_MODELS[modelInput]) return ANTHROPIC_MODELS[modelInput];
-    // If it looks like an Anthropic model ID already (e.g. "claude-opus-4-20250514"), use it
-    if (modelInput.startsWith("claude-")) return modelInput;
-    // Non-Claude model requested — fall back to default (can't use GPT/Gemini/etc. via Anthropic)
-    console.warn(`Model "${modelInput}" not available via Anthropic API, using default: ${config.API.default_model}`);
-    return config.API.default_model;
-  }
-
-  // OpenRouter path
-  if (config.API.models[modelInput]) return config.API.models[modelInput];
-  return modelInput;
+  if (ANTHROPIC_MODELS[modelInput]) return ANTHROPIC_MODELS[modelInput];
+  if (modelInput.startsWith("claude-")) return modelInput;
+  console.warn(`Model "${modelInput}" not recognized, using default: ${config.API.default_model}`);
+  return config.API.default_model;
 }
 
 function getPath(event) {
@@ -276,50 +193,57 @@ async function handleAnalyze(body) {
   const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
-  // Call LLM (Anthropic direct or OpenRouter)
-  const llmResponse = await callLLM({
-    model,
-    max_tokens: xlMode ? 16384 : 8192,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: xlMode ? 16384 : 8192,
+      system: systemPrompt,
+      messages: [
+        { role: "user", content: userMessage },
+      ],
+    }),
   });
 
-  if (!llmResponse.ok) {
-    const errText = await llmResponse.text();
-    console.error(`LLM API error (${llmResponse.status}):`, errText);
-    return response(llmResponse.status, {
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
       error: "LLM API error",
-      status: llmResponse.status,
+      status: apiResponse.status,
       details: errText,
     });
   }
 
-  const data = await llmResponse.json();
+  const data = await apiResponse.json();
 
-  // Check for API-level errors (model unavailable, content filtered, etc.)
-  const apiError = parseLLMError(data);
-  if (apiError) {
-    console.error("LLM API error:", apiError);
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
     return response(422, {
-      error: apiError || "Model returned an error. Try a different model.",
+      error: data.error?.message || "Model returned an error.",
     });
   }
 
-  const { text: responseText, finishReason, model: usedModel, usage } = parseLLMResponse(data);
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
   if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+    return response(422, { error: "Model returned empty response. Try again." });
   }
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
-    const truncated = finishReason === "length";
+    const truncated = stopReason === "max_tokens";
     return response(422, {
       error: truncated
-        ? "Model response was cut off (too long). Try a different model."
-        : "Model returned invalid JSON. Try again or use a different model.",
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -331,8 +255,8 @@ async function handleAnalyze(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: usedModel || model,
-    usage: usage || null,
+    model_used: data.model || model,
+    usage: data.usage || null,
   });
 }
 
@@ -353,49 +277,57 @@ async function handleOptimize(body) {
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
-  // Call LLM (Anthropic direct or OpenRouter)
-  const llmResponse = await callLLM({
-    model,
-    max_tokens: xlMode ? 16384 : 8192,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
+  // Call Anthropic Messages API
+  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: xlMode ? 16384 : 8192,
+      system: systemPrompt,
+      messages: [
+        { role: "user", content: userMessage },
+      ],
+    }),
   });
 
-  if (!llmResponse.ok) {
-    const errText = await llmResponse.text();
-    console.error(`LLM API error (${llmResponse.status}):`, errText);
-    return response(llmResponse.status, {
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`Anthropic error (${apiResponse.status}):`, errText);
+    return response(apiResponse.status, {
       error: "LLM API error",
-      status: llmResponse.status,
+      status: apiResponse.status,
       details: errText,
     });
   }
 
-  const data = await llmResponse.json();
+  const data = await apiResponse.json();
 
-  const apiError = parseLLMError(data);
-  if (apiError) {
-    console.error("LLM API error:", apiError);
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
     return response(422, {
-      error: apiError || "Model returned an error. Try a different model.",
+      error: data.error?.message || "Model returned an error.",
     });
   }
 
-  const { text: responseText, finishReason, model: usedModel, usage } = parseLLMResponse(data);
+  const responseText = data.content?.[0]?.text || "";
+  const stopReason = data.stop_reason;
   if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again or use a different model." });
+    return response(422, { error: "Model returned empty response. Try again." });
   }
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(responseText));
   if (!resumeData) {
-    const truncated = finishReason === "length";
+    const truncated = stopReason === "max_tokens";
     return response(422, {
       error: truncated
-        ? "Model response was cut off (too long). Try a different model."
-        : "Model returned invalid JSON. Try again or use a different model.",
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid JSON. Try again.",
       raw_preview: responseText.substring(0, 500),
     });
   }
@@ -407,8 +339,8 @@ async function handleOptimize(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: usedModel || model,
-    usage: usage || null,
+    model_used: data.model || model,
+    usage: data.usage || null,
     mode: "optimize",
   });
 }
@@ -433,24 +365,12 @@ async function handleBuild(body) {
 // ── Route: GET /models ──
 
 function handleModels() {
-  if (useAnthropic()) {
-    // Only Claude models available when using Anthropic API directly
-    return response(200, {
-      default: "claude-opus-4.6",
-      models: Object.entries(ANTHROPIC_MODELS).map(([alias, id]) => ({
-        alias,
-        id,
-        provider: "anthropic",
-      })),
-    });
-  }
-
   return response(200, {
-    default: "claude-sonnet",
-    models: Object.entries(config.API.models).map(([alias, id]) => ({
+    default: "claude-opus-4.6",
+    models: Object.entries(ANTHROPIC_MODELS).map(([alias, id]) => ({
       alias,
       id,
-      provider: id.split("/")[0],
+      provider: "anthropic",
     })),
   });
 }
@@ -534,17 +454,25 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call LLM with streaming
-    let llmStreamResponse;
+    // Call Anthropic Messages API with streaming
+    let apiResponse;
     try {
-      llmStreamResponse = await callLLM({
-        model,
-        max_tokens: 4096,
-        stream: true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
+      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          system: systemPrompt,
+          messages: [
+            { role: "user", content: userMessage },
+          ],
+        }),
       });
     } catch (err) {
       responseStream.write(`data: ${JSON.stringify({ type: "error", error: "Failed to connect to AI service" })}\n\n`);
@@ -552,18 +480,18 @@ if (typeof awslambda !== "undefined") {
       return;
     }
 
-    if (!llmStreamResponse.ok) {
-      const errText = await llmStreamResponse.text();
-      console.error(`LLM stream error (${llmStreamResponse.status}):`, errText);
-      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: llmStreamResponse.status })}\n\n`);
+    if (!apiResponse.ok) {
+      const errText = await apiResponse.text();
+      console.error(`Anthropic stream error (${apiResponse.status}):`, errText);
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "LLM API error", status: apiResponse.status })}\n\n`);
       responseStream.end();
       return;
     }
 
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "AI is writing..." })}\n\n`);
 
-    // Read streaming response and forward chunks
-    const reader = llmStreamResponse.body.getReader();
+    // Read Anthropic SSE stream and forward content deltas
+    const reader = apiResponse.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
     let buffer = "";
@@ -574,24 +502,19 @@ if (typeof awslambda !== "undefined") {
 
       buffer += decoder.decode(value, { stream: true });
 
+      // Process complete SSE lines from Anthropic
       const lines = buffer.split("\n");
       buffer = lines.pop(); // Keep incomplete line in buffer
 
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
-        const eventData = line.slice(6).trim();
-        if (eventData === "[DONE]") continue;
+        const data = line.slice(6).trim();
 
         try {
-          const parsed = JSON.parse(eventData);
-          // Anthropic SSE: content_block_delta with delta.text
-          // OpenRouter SSE: choices[0].delta.content
-          const delta = useAnthropic()
-            ? (parsed.delta?.text || "")
-            : (parsed.choices?.[0]?.delta?.content || "");
-          if (delta) {
-            fullText += delta;
-            responseStream.write(`data: ${JSON.stringify({ type: "content", delta })}\n\n`);
+          const parsed = JSON.parse(data);
+          if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            responseStream.write(`data: ${JSON.stringify({ type: "content", delta: parsed.delta.text })}\n\n`);
           }
         } catch {}
       }
