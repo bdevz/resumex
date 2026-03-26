@@ -193,23 +193,35 @@ async function handleAnalyze(body) {
   const userMessage = buildUserMessage(jd, customer, context, companies);
   const model = resolveModel(modelInput);
 
-  // Call Anthropic Messages API
-  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: xlMode ? 16384 : 8192,
-      system: systemPrompt,
-      messages: [
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
+  // Call Anthropic Messages API (4 min timeout — leaves buffer before Lambda's 5 min limit)
+  let apiResponse;
+  try {
+    apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      signal: AbortSignal.timeout(240_000),
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: xlMode ? 16384 : 8192,
+        system: systemPrompt,
+        messages: [
+          { role: "user", content: userMessage },
+        ],
+      }),
+    });
+  } catch (fetchErr) {
+    const isTimeout = fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError";
+    console.error("Anthropic fetch failed:", fetchErr.message);
+    return response(504, {
+      error: isTimeout
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku) or disable XL mode."
+        : `Network error calling LLM API: ${fetchErr.message}`,
+    });
+  }
 
   if (!apiResponse.ok) {
     const errText = await apiResponse.text();
@@ -277,23 +289,35 @@ async function handleOptimize(body) {
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
-  // Call Anthropic Messages API
-  const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: xlMode ? 16384 : 8192,
-      system: systemPrompt,
-      messages: [
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
+  // Call Anthropic Messages API (4 min timeout — leaves buffer before Lambda's 5 min limit)
+  let apiResponse;
+  try {
+    apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      signal: AbortSignal.timeout(240_000),
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: xlMode ? 16384 : 8192,
+        system: systemPrompt,
+        messages: [
+          { role: "user", content: userMessage },
+        ],
+      }),
+    });
+  } catch (fetchErr) {
+    const isTimeout = fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError";
+    console.error("Anthropic fetch failed:", fetchErr.message);
+    return response(504, {
+      error: isTimeout
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku) or disable XL mode."
+        : `Network error calling LLM API: ${fetchErr.message}`,
+    });
+  }
 
   if (!apiResponse.ok) {
     const errText = await apiResponse.text();
@@ -454,11 +478,12 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call Anthropic Messages API with streaming
+    // Call Anthropic Messages API with streaming (4 min timeout)
     let apiResponse;
     try {
       apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
+        signal: AbortSignal.timeout(240_000),
         headers: {
           "Content-Type": "application/json",
           "x-api-key": process.env.ANTHROPIC_API_KEY,
@@ -475,7 +500,11 @@ if (typeof awslambda !== "undefined") {
         }),
       });
     } catch (err) {
-      responseStream.write(`data: ${JSON.stringify({ type: "error", error: "Failed to connect to AI service" })}\n\n`);
+      const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
+      const msg = isTimeout
+        ? "The model took too long to respond. Try a faster model."
+        : "Failed to connect to AI service";
+      responseStream.write(`data: ${JSON.stringify({ type: "error", error: msg })}\n\n`);
       responseStream.end();
       return;
     }
