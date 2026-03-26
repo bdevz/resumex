@@ -83,6 +83,31 @@ aws iam attach-role-policy \
   --role-name "$ROLE_NAME" \
   --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" 2>/dev/null || true
 
+# Inline policy for S3 job results + Lambda self-invoke (needed for async job pattern)
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+INLINE_POLICY=$(cat <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::resumex-${ACCOUNT_ID}/jobs/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}"
+    }
+  ]
+}
+POLICY
+)
+aws iam put-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-name "resumex-async-jobs" \
+  --policy-document "$INLINE_POLICY" 2>/dev/null || true
+
 echo "  Role: $ROLE_ARN"
 
 # Wait for role to propagate
@@ -99,7 +124,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --handler "index.handler" \
   --role "$ROLE_ARN" \
   --zip-file "fileb://lambda.zip" \
-  --timeout 60 \
+  --timeout 300 \
   --memory-size 512 \
   --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
   --region "$REGION" \
@@ -115,7 +140,7 @@ LAMBDA_ARN=$(aws lambda create-function \
 
   aws lambda update-function-configuration \
     --function-name "$FUNCTION_NAME" \
-    --timeout 60 \
+    --timeout 300 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
     --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
@@ -199,7 +224,7 @@ aws s3api put-bucket-policy --bucket "$S3_BUCKET" --policy "$BUCKET_POLICY" 2>/d
 aws s3 website "s3://$S3_BUCKET" --index-document index.html 2>/dev/null
 
 # Inject Lambda URL into frontend
-sed "s|%%LAMBDA_URL%%|${LAMBDA_URL}|g" frontend/index.html > /tmp/index.html
+sed "s|%%API_URL%%|${LAMBDA_URL}|g" frontend/index.html > /tmp/index.html
 
 # Upload HTML
 aws s3 cp /tmp/index.html "s3://$S3_BUCKET/index.html" \
