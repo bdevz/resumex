@@ -155,22 +155,9 @@ BULLET REQUIREMENTS:
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 250 characters for XL mode)
 - Focus on achievements, not responsibilities
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
 - Use digits instead of spelling out numbers
 - NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume.
-With 10-15 bullets per role, maximum 5 should have hard metrics (%, $, from-X-to-Y).
-The remaining 5-10 bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons.
-Instead, describe WHAT you built, HOW it worked, or WHY it mattered — in plain language.
-A resume that reads like a human wrote it stands out.
-
+${buildAntiSlopPromptSection("xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 The first 3 bullets of each role are the ONLY ones most hiring managers will read.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
