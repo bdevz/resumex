@@ -150,3 +150,43 @@ describe("buildAntiSlopPromptSection()", () => {
     assert.ok(result.includes("CAR"), "should mention CAR pattern");
   });
 });
+
+describe("buildSystemPrompt() anti-slop integration", () => {
+  const prompt = prompts.buildSystemPrompt();
+
+  it("contains anti-slop section from config", () => {
+    assert.ok(prompt.includes("WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:"));
+    assert.ok(prompt.includes("tired engineer"));
+    assert.ok(prompt.includes("delve"));
+  });
+
+  it("no longer contains old hardcoded adverb guidance", () => {
+    assert.ok(
+      !prompt.includes('"strategically", "innovatively", "meticulously"'),
+      "old hardcoded adverb list should be removed"
+    );
+    assert.ok(
+      !prompt.includes("Avoid excessive adjectives/adverbs"),
+      "old 'Avoid excessive' line should be removed"
+    );
+  });
+
+  it("no longer contains old hardcoded 'A resume that reads like a human' line", () => {
+    assert.ok(
+      !prompt.includes("A resume that reads like a human wrote it stands out"),
+      "old standalone human-resume line should be removed"
+    );
+  });
+
+  it("still contains digit formatting guidance", () => {
+    assert.ok(prompt.includes("digits instead of spelling out numbers"));
+  });
+
+  it("still contains CRITICAL RULES", () => {
+    assert.ok(prompt.includes("CRITICAL RULES:"));
+  });
+
+  it("still contains BULLET ORDERING section", () => {
+    assert.ok(prompt.includes("BULLET ORDERING"));
+  });
+});

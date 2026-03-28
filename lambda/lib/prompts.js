@@ -64,26 +64,8 @@ BULLET REQUIREMENTS:
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 200 characters)
 - Focus on achievements, not responsibilities
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
 - Use digits instead of spelling out numbers (8 not "eight")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume — when EVERY bullet has a percentage or dollar amount.
-- Maximum 4 bullets per role should have hard metrics (%, $, from-X-to-Y comparisons)
-- The remaining bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons
-- Instead, those bullets should describe WHAT you built, HOW it worked, or WHY it mattered — in plain language
-
-Example of a GOOD non-metric bullet: "Designed a caching layer using Redis to serve frequently accessed legal documents without hitting the database on every request"
-Example of a GOOD non-metric bullet: "Built an internal CLI tool that automated sandbox provisioning, replacing a 15-step manual process the team had been doing since launch"
-Example of a BAD pattern (every bullet has numbers): "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms..." — this reads like AI slop.
-
-A resume that reads like a human wrote it stands out.
-
+${buildAntiSlopPromptSection("standard")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Hiring managers spend 6 seconds scanning a resume. The first 2 bullets of each role are the ONLY ones most will read.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE (how many users/systems/teams), IMPACT (business outcome), and LEADERSHIP
