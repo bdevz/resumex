@@ -81,7 +81,7 @@ Config schema:
 max_metric_ratio: {
   standard:      { max: 4,  per: "6-8",   description: "..." },
   xl:            { max: 5,  per: "10-15", description: "..." },
-  optimize:      { max: 4,  per: "6-8",   description: "..." },
+  optimize:      { max: 4,  per: "6-8",   description: "..." },  // prose says "3-4"; config captures upper bound
   "optimize-xl": { max: 7,  per: "10-15", description: "..." },
 }
 ```
