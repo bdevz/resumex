@@ -653,6 +653,61 @@ function buildOptimizeUserMessage(resume, jd, context) {
   return message;
 }
 
+function buildAntiSlopPromptSection(mode) {
+  const slop = config.ANTI_SLOP;
+
+  const hardWords = slop.banned_words.filter(w => w.severity === "hard").map(w => w.word);
+  const softWords = slop.banned_words.filter(w => w.severity === "soft").map(w => w.word);
+  const hardPhrases = slop.banned_phrases.filter(p => p.severity === "hard").map(p => p.phrase);
+  const softPhrases = slop.banned_phrases.filter(p => p.severity === "soft").map(p => p.phrase);
+
+  const ratio = slop.max_metric_ratio[mode] || slop.max_metric_ratio.standard;
+
+  let section = `\nWRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:\n`;
+  section += slop.tone + "\n";
+
+  section += `\nNEVER use these words — they are the #1 signal of AI-generated writing:\n`;
+  section += hardWords.join(", ") + "\n";
+
+  section += `\nAvoid these words when possible:\n`;
+  section += softWords.join(", ") + "\n";
+
+  section += `\nNEVER use these phrase patterns:\n`;
+  section += hardPhrases.map(p => `- "${p}"`).join("\n") + "\n";
+
+  if (softPhrases.length > 0) {
+    section += `\nAvoid these phrases when possible:\n`;
+    section += softPhrases.map(p => `- "${p}"`).join("\n") + "\n";
+  }
+
+  section += `\nSTRUCTURAL ANTI-PATTERNS TO AVOID:\n`;
+  for (const pat of slop.structural_patterns) {
+    const verb = pat.severity === "hard" ? "NEVER" : "Avoid";
+    section += `\n${verb}: ${pat.description}\n`;
+    section += `  BAD: "${pat.example_bad}"\n`;
+    section += `  GOOD: "${pat.example_good}"\n`;
+  }
+
+  section += `\nMETRIC RATIO: ${ratio.description}.\n`;
+  section += `The remaining bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons.\n`;
+  section += `Instead, describe WHAT you built, HOW it worked, or WHY it mattered — in plain language.\n`;
+
+  section += `\nEXAMPLES — LEARN THE DIFFERENCE:\n`;
+  for (const ex of slop.examples) {
+    section += `\n  BAD: "${ex.bad}"\n`;
+    section += `  GOOD: "${ex.good}"\n`;
+    section += `  WHY: ${ex.why}\n`;
+  }
+
+  section += `\nMix sentence structures naturally — do NOT write every bullet in the same pattern:\n`;
+  section += `- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)\n`;
+  section += `- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)\n`;
+  section += `- Some bullets: Start with the impact/scale, then explain how\n`;
+  section += `- Some bullets: Lead with the technology choice, then show the outcome\n`;
+
+  return section;
+}
+
 module.exports = {
   buildSystemPrompt,
   buildSystemPromptXL,
@@ -660,6 +715,7 @@ module.exports = {
   buildOptimizeSystemPrompt,
   buildOptimizeSystemPromptXL,
   buildOptimizeUserMessage,
+  buildAntiSlopPromptSection,
   scoreResume,
   validateTimeline
 };

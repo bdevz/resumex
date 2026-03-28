@@ -1,8 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const config = require("../config");
-// NOTE: In Task 2, add this line below config require:
-// const prompts = require("../prompts");
+const prompts = require("../prompts");
 
 describe("ANTI_SLOP config", () => {
   it("is exported from config", () => {
@@ -91,5 +90,63 @@ describe("ANTI_SLOP config", () => {
       !bannedWords.includes("cultivate"),
       "cultivate must not be banned — Cultivated is in ACTION_VERBS"
     );
+  });
+});
+
+describe("buildAntiSlopPromptSection()", () => {
+  const { buildAntiSlopPromptSection } = prompts;
+
+  it("is exported from prompts", () => {
+    assert.equal(typeof buildAntiSlopPromptSection, "function");
+  });
+
+  it("returns a string containing tone guidance", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("tired engineer"), "should contain tone guidance");
+  });
+
+  it("returns a string containing hard-banned words", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("delve"), "should list banned word 'delve'");
+    assert.ok(result.includes("NEVER"), "hard bans should use NEVER");
+  });
+
+  it("returns a string containing soft-banned words", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("robust"), "should list soft-banned word 'robust'");
+    assert.ok(result.includes("Avoid"), "soft bans should use Avoid");
+  });
+
+  it("returns a string containing banned phrases", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("plays a vital role"));
+  });
+
+  it("returns a string containing structural anti-patterns with examples", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("adjective"), "should mention adjective triplet");
+    assert.ok(result.includes("BAD:"), "should have BAD example labels");
+    assert.ok(result.includes("GOOD:"), "should have GOOD example labels");
+  });
+
+  it("returns a string containing good/bad example pairs", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("Spearheaded a transformative"), "should contain bad example");
+    assert.ok(result.includes("Moved 14 services"), "should contain good example");
+    assert.ok(result.includes("WHY:"), "should explain why");
+  });
+
+  it("includes metric ratio for the given mode", () => {
+    const standard = buildAntiSlopPromptSection("standard");
+    assert.ok(standard.includes("6-8"), "standard mode should reference 6-8 bullets");
+
+    const xl = buildAntiSlopPromptSection("xl");
+    assert.ok(xl.includes("10-15"), "xl mode should reference 10-15 bullets");
+  });
+
+  it("includes sentence structure variety guidance", () => {
+    const result = buildAntiSlopPromptSection("standard");
+    assert.ok(result.includes("XYZ"), "should mention XYZ pattern");
+    assert.ok(result.includes("CAR"), "should mention CAR pattern");
   });
 });
