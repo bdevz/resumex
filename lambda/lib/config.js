@@ -312,6 +312,123 @@ const SOFT_SKILL_RULES = {
   min_mentoring_per_senior_role: 1,
 };
 
+// --- Anti-AI-slop writing rules (config-driven, injected into all prompts) ---
+const ANTI_SLOP = {
+  banned_words: [
+    { word: "delve", severity: "hard" },
+    { word: "pivotal", severity: "hard" },
+    { word: "underscore", severity: "hard" },
+    { word: "landscape", severity: "hard" },
+    { word: "foster", severity: "hard" },
+    { word: "testament", severity: "hard" },
+    { word: "leverage", severity: "hard" },
+    { word: "spearhead", severity: "hard" },
+    { word: "harness", severity: "hard" },
+    { word: "elevate", severity: "hard" },
+    { word: "bolster", severity: "hard" },
+    { word: "utilize", severity: "hard" },
+    { word: "tapestry", severity: "hard" },
+    { word: "intricate", severity: "hard" },
+    { word: "groundbreaking", severity: "hard" },
+    { word: "transformative", severity: "hard" },
+    { word: "innovative", severity: "hard" },
+    { word: "revolutionize", severity: "hard" },
+    { word: "synergy", severity: "hard" },
+    { word: "paradigm", severity: "hard" },
+    { word: "robust", severity: "soft" },
+    { word: "seamless", severity: "soft" },
+    { word: "comprehensive", severity: "soft" },
+    { word: "cutting-edge", severity: "soft" },
+    { word: "world-class", severity: "soft" },
+    { word: "best-in-class", severity: "soft" },
+    { word: "holistic", severity: "soft" },
+  ],
+
+  banned_phrases: [
+    { phrase: "not just X, but Y", severity: "hard" },
+    { phrase: "plays a vital role", severity: "hard" },
+    { phrase: "stands as a testament", severity: "hard" },
+    { phrase: "it's important to note", severity: "hard" },
+    { phrase: "from X to Y (rhetorical, not metric)", severity: "hard" },
+    { phrase: "driving innovation", severity: "hard" },
+    { phrase: "ensuring seamless", severity: "hard" },
+    { phrase: "state-of-the-art", severity: "hard" },
+    { phrase: "in today's fast-paced", severity: "hard" },
+    { phrase: "at the forefront of", severity: "hard" },
+    { phrase: "end-to-end", severity: "soft" },
+    { phrase: "above and beyond", severity: "soft" },
+    { phrase: "key stakeholders", severity: "soft" },
+  ],
+
+  structural_patterns: [
+    {
+      name: "adjective_triplet",
+      description: "Three adjectives in a row separated by commas",
+      example_bad: "Built a scalable, resilient, and performant API gateway",
+      example_good: "Built an API gateway that handled 50K concurrent connections without falling over",
+      severity: "hard",
+    },
+    {
+      name: "trailing_ing_clause",
+      description: "Dangling -ing clause tacked onto the end that adds no specifics",
+      example_bad: "Migrated 12 services to Kubernetes, ensuring high availability and compliance",
+      example_good: "Migrated 12 services to Kubernetes — two of them had zero-downtime requirements that forced us to run blue-green deploys for 3 weeks",
+      severity: "hard",
+    },
+    {
+      name: "em_dash_overuse",
+      description: "More than one em dash in a single bullet",
+      example_bad: "Designed a caching layer — Redis-based — that reduced latency — improving UX significantly",
+      example_good: "Designed a Redis caching layer that cut API response times from 1.2s to 180ms",
+      severity: "soft",
+    },
+    {
+      name: "every_bullet_has_metric",
+      description: "When every single bullet in a role has a percentage, dollar amount, or numeric comparison — this is the #1 sign of an AI resume",
+      example_bad: "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms...",
+      example_good: "4 out of 6 bullets have metrics. The rest describe what was built and why it mattered.",
+      severity: "hard",
+    },
+    {
+      name: "metric_stacking",
+      description: "Cramming multiple unrelated metrics into one bullet",
+      example_bad: "Reduced latency by 40%, increased throughput by 200%, saving $1.2M annually while improving NPS by 15 points",
+      example_good: "Reduced API latency by 40% by adding a Redis read-through cache in front of the payments table",
+      severity: "hard",
+    },
+  ],
+
+  examples: [
+    {
+      bad: "Spearheaded a transformative cloud migration initiative leveraging Kubernetes and Terraform, resulting in a 60% reduction in infrastructure costs",
+      good: "Moved 14 services from EC2 to EKS over 4 months — the hardest part was untangling the shared RDS instance that three teams depended on",
+      why: "The bad version uses 'spearheaded', 'transformative', 'leveraging', 'initiative' — four AI tells in one sentence. The good version sounds like someone who actually did the work.",
+    },
+    {
+      bad: "Drove innovation by implementing a robust microservices architecture, ensuring seamless scalability and enhanced system reliability",
+      good: "Broke a Rails monolith into 6 services so deploys stopped taking down the whole app every Thursday",
+      why: "The bad version is all buzzwords. The good version has a specific pain point (Thursday deploys) that no AI would invent.",
+    },
+    {
+      bad: "Leveraged cutting-edge machine learning algorithms to optimize customer engagement metrics, achieving a 45% improvement in retention rates",
+      good: "Built a churn prediction model using XGBoost that flagged at-risk accounts 2 weeks before they cancelled — the CS team used it to save about 30% of them",
+      why: "Specificity beats superlatives. Name the model, name the team, describe the workflow.",
+    },
+  ],
+
+  tone: `Write like a tired engineer updating their resume at 11pm, not like a marketing copywriter.
+Be specific and plain. If something was hard, say it was hard. If the scope was small, don't inflate it.
+A human resume has personality — it mentions the annoying migration, the team that was skeptical, the workaround that became permanent.
+Never make every bullet sound triumphant. Real work is messy.`,
+
+  max_metric_ratio: {
+    standard:      { max: 4, per: "6-8",   description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    xl:            { max: 5, per: "10-15",  description: "At most 5 of 10-15 bullets per role should have hard metrics" },
+    optimize:      { max: 4, per: "6-8",    description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    "optimize-xl": { max: 7, per: "10-15",  description: "At most 5-7 of 10-15 bullets per role should have hard metrics" },
+  },
+};
+
 module.exports = {
   API,
   CONTACT,
@@ -330,4 +447,5 @@ module.exports = {
   TECH_TIMELINE,
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
+  ANTI_SLOP,
 };
