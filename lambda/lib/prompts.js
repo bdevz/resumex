@@ -474,17 +474,7 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood). Use direct verbs (Built, Designed, Developed, Led, Reduced, Improved)
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-- 3-4 bullets per role should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
-A resume that reads like a human wrote it stands out.
-
+${buildAntiSlopPromptSection("optimize")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 When rewriting bullets, place the strongest rewritten bullets FIRST in each role.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE, IMPACT, and LEADERSHIP
