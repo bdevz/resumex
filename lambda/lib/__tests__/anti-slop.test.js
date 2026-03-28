@@ -260,3 +260,31 @@ describe("buildOptimizeSystemPrompt() anti-slop integration", () => {
     assert.ok(prompt.includes("OPTIMIZATION RULES:"));
   });
 });
+
+describe("buildOptimizeSystemPromptXL() anti-slop integration", () => {
+  const prompt = prompts.buildOptimizeSystemPromptXL();
+
+  it("contains anti-slop section from config", () => {
+    assert.ok(prompt.includes("WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:"));
+    assert.ok(prompt.includes("tired engineer"));
+  });
+
+  it("uses optimize-xl metric ratio", () => {
+    assert.ok(prompt.includes("10-15"));
+  });
+
+  it("no longer contains old hardcoded adverb guidance", () => {
+    assert.ok(
+      !prompt.includes('"strategically", "innovatively", "meticulously"'),
+      "old hardcoded adverb list should be removed"
+    );
+    assert.ok(
+      !prompt.includes("Avoid excessive adjectives/adverbs"),
+      "old 'Avoid excessive' line should be removed"
+    );
+  });
+
+  it("still contains OPTIMIZATION RULES", () => {
+    assert.ok(prompt.includes("OPTIMIZATION RULES:"));
+  });
+});

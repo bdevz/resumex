@@ -569,16 +569,7 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-With 10-15 bullets per role, 5-7 should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
-
+${buildAntiSlopPromptSection("optimize-xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Place the strongest rewritten bullets FIRST in each role.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
