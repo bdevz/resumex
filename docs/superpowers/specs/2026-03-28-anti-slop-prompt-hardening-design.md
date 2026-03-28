@@ -32,19 +32,34 @@ This allows softening rules without removing them.
 
 ### 1. `ANTI_SLOP` config block in `config.js`
 
-**Banned words** — single words that signal AI writing:
-- Hard: "delve", "pivotal", "underscore", "landscape", "foster", "testament", "leverage", "streamline", "spearhead", "harness", "elevate", "bolster", "utilize", "tapestry", "intricate", "groundbreaking", "transformative", "innovative", "revolutionize", "synergy", "paradigm"
+**Banned words** — single words that signal AI writing. Bans apply to the listed word and its obvious morphological forms (e.g., "leverage" bans "leveraged", "leveraging"). However, if a form appears in `ACTION_VERBS`, the action verb takes precedence — the ban targets the buzzword usage, not the action verb usage. For example, "transformative" (adjective) is banned but "Transformed" (action verb in `ACTION_VERBS.leadership`) is allowed.
+- Hard: "delve", "pivotal", "underscore", "landscape", "foster", "testament", "leverage", "spearhead", "harness", "elevate", "bolster", "utilize", "tapestry", "intricate", "groundbreaking", "transformative", "innovative", "revolutionize", "synergy", "paradigm"
 - Soft: "robust", "seamless", "comprehensive", "cutting-edge", "world-class", "best-in-class", "holistic"
+
+Note: "streamline" is removed from this list because "Streamlined" exists in `ACTION_VERBS.problem_solving`. If we want to ban it, we must also remove it from `ACTION_VERBS` first. Same logic applies to "cultivate" — `ACTION_VERBS.mentoring` includes "Cultivated", so it is not banned here. "utilize" is intentionally redundant with `WEAK_VERBS` (which already contains "utilized") for emphasis in the prompt.
 
 **Banned phrases** — multi-word patterns:
 - Hard: "not just X, but Y", "plays a vital role", "stands as a testament", "it's important to note", "from X to Y" (rhetorical, not metric), "driving innovation", "ensuring seamless", "state-of-the-art", "in today's fast-paced", "at the forefront of"
-- Soft: "end-to-end", "above and beyond", "key stakeholders"
+- Soft: "end-to-end" (exception: legitimate technical uses like "end-to-end encryption" or "end-to-end testing" are fine), "above and beyond", "key stakeholders"
 
-**Structural anti-patterns** — each with name, description, bad example, good example, and severity:
+**Structural anti-patterns** — each is an object with this schema:
+```js
+{
+  name: string,        // identifier
+  description: string, // what the pattern is
+  example_bad: string, // example of the anti-pattern
+  example_good: string,// what to write instead
+  severity: "hard" | "soft"
+}
+```
+
+These are **prompt instructions only** — the system tells the AI model not to produce these patterns. They are not programmatically detected or enforced post-generation.
+
+Patterns:
 - `adjective_triplet` (hard): Three adjectives in a row ("scalable, resilient, and performant")
 - `trailing_ing_clause` (hard): Dangling -ing clause that adds no specifics ("...ensuring compliance across all departments")
 - `em_dash_overuse` (soft): More than one em dash in a single bullet
-- `every_bullet_has_metric` (hard): Every single bullet in a role has a percentage, dollar amount, or numeric comparison
+- `every_bullet_has_metric` (hard): Every single bullet in a role has a percentage, dollar amount, or numeric comparison. This is a role-level pattern — the prompt instructs the model to vary bullet types across a role, not something detectable from a single bullet.
 - `metric_stacking` (hard): Multiple unrelated metrics crammed into one bullet
 
 **Good vs bad examples** — three pairs with explanations injected into the prompt:
@@ -55,9 +70,21 @@ This allows softening rules without removing them.
 **Tone guidance:**
 > Write like a tired engineer updating their resume at 11pm, not like a marketing copywriter. Be specific and plain. If something was hard, say it was hard. If the scope was small, don't inflate it. A human resume has personality — it mentions the annoying migration, the team that was skeptical, the workaround that became permanent. Never make every bullet sound triumphant. Real work is messy.
 
-**Metric ratio constraint:**
-- Standard mode: at most 4 of 6 bullets per role should have hard metrics
-- XL mode: at most 7 of 15 bullets per role should have hard metrics
+**Metric ratio constraint** — varies by mode. These align with the existing prompt guidance, now consolidated:
+- `standard` (generate): at most 4 of 6-8 bullets per role (matches existing `buildSystemPrompt` guidance)
+- `xl` (generate): at most 5 of 10-15 bullets per role (matches existing `buildSystemPromptXL` guidance)
+- `optimize`: 3-4 of 6-8 bullets per role (matches existing `buildOptimizeSystemPrompt` guidance)
+- `optimize-xl`: 5-7 of 10-15 bullets per role (matches existing `buildOptimizeSystemPromptXL` guidance)
+
+Config schema:
+```js
+max_metric_ratio: {
+  standard:      { max: 4,  per: "6-8",   description: "..." },
+  xl:            { max: 5,  per: "10-15", description: "..." },
+  optimize:      { max: 4,  per: "6-8",   description: "..." },
+  "optimize-xl": { max: 7,  per: "10-15", description: "..." },
+}
+```
 
 ### 2. `buildAntiSlopPromptSection(mode)` in `prompts.js`
 
@@ -67,7 +94,9 @@ A single function that:
 3. Selects metric ratio based on mode parameter
 4. Assembles and returns a prompt string covering: tone, banned vocabulary, banned phrases, structural anti-patterns with examples, metric ratio, good/bad example pairs, and sentence structure variety guidance
 
-Takes a `mode` parameter: `"standard"`, `"xl"`, `"optimize"`, `"optimize-xl"`.
+Takes a `mode` parameter: `"standard"`, `"xl"`, `"optimize"`, `"optimize-xl"`. The **only** thing that varies by mode is the metric ratio constraint. All other rules (banned words, phrases, structural patterns, examples, tone) are identical across modes.
+
+Note: the bad examples deliberately contain banned words (e.g., "Spearheaded", "leveraged") as negative examples. These are intentional — they teach the model what not to write. If a future iteration adds post-generation banned-word scanning, these examples must be excluded from detection.
 
 ### 3. Prompt builder changes
 
@@ -99,6 +128,8 @@ Each of the four prompt builders removes its scattered anti-slop guidance and re
 - TECHNOLOGY TIMELINE section
 - "Use digits instead of spelling out numbers" (formatting, not anti-slop)
 
+**Sentence structure variety guidance** (XYZ, CAR, impact-first, technology-first patterns) moves into `buildAntiSlopPromptSection()` since it is part of the "sound human" writing style. It is hardcoded in the function, not in the config, because it is structural guidance that rarely changes — unlike banned words which are iterated frequently.
+
 ## Files changed
 
 | File | Change |
@@ -107,6 +138,8 @@ Each of the four prompt builders removes its scattered anti-slop guidance and re
 | `lambda/lib/prompts.js` | Add `buildAntiSlopPromptSection(mode)`, remove scattered anti-slop from 4 prompt builders, insert function call in each |
 
 No other files change. No changes to `scoreResume()`, `scoreBullet()`, `validateTimeline()`, or `lambda/index.js`.
+
+**Known pre-existing issue:** The streaming handler in `lambda/index.js` currently ignores `xlMode` and always calls `buildSystemPrompt()` / `buildOptimizeSystemPrompt()` rather than their XL variants. This means the streaming path always gets standard-mode metric ratios. This is out of scope for this change — the anti-slop function will receive the correct mode from whichever prompt builder calls it, so if the streaming handler calls the standard builder, it gets standard anti-slop. Fixing the streaming handler's mode selection is a separate task.
 
 ## Iteration workflow
 
