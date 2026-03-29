@@ -65,6 +65,7 @@ BULLET REQUIREMENTS:
 - Keep bullets to 1-2 lines (under 200 characters)
 - Focus on achievements, not responsibilities
 - Use digits instead of spelling out numbers (8 not "eight")
+${buildKeywordPlacementSection()}
 ${buildAntiSlopPromptSection("standard")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Hiring managers spend 6 seconds scanning a resume. The first 2 bullets of each role are the ONLY ones most will read.
@@ -157,6 +158,7 @@ BULLET REQUIREMENTS:
 - Focus on achievements, not responsibilities
 - Use digits instead of spelling out numbers
 - NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
+${buildKeywordPlacementSection()}
 ${buildAntiSlopPromptSection("xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 The first 3 bullets of each role are the ONLY ones most hiring managers will read.
@@ -508,6 +510,7 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood). Use direct verbs (Built, Designed, Developed, Led, Reduced, Improved)
+${buildKeywordPlacementSection()}
 ${buildAntiSlopPromptSection("optimize")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 When rewriting bullets, place the strongest rewritten bullets FIRST in each role.
@@ -603,6 +606,7 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
+${buildKeywordPlacementSection()}
 ${buildAntiSlopPromptSection("optimize-xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Place the strongest rewritten bullets FIRST in each role.
@@ -635,6 +639,40 @@ function buildOptimizeUserMessage(resume, jd, context) {
   message += `\n\nOptimize the resume for this job description. Preserve all real companies, titles, and dates. Rewrite bullets with metrics and JD keywords. Return ONLY the JSON response.`;
 
   return message;
+}
+
+function buildKeywordPlacementSection() {
+  return `
+KEYWORD PLACEMENT — 100% MATCH IS NON-NEGOTIABLE:
+The resume MUST contain every single technology, tool, framework, methodology, and requirement mentioned in the JD. A recruiter scanning this resume should think "this candidate is a perfect fit" within 6 seconds.
+
+STEP 1 — EXTRACT ALL KEYWORDS FROM THE JD:
+Before writing anything, identify two categories:
+- EXPLICIT keywords: every technology, tool, language, framework, methodology, certification, and domain term that appears literally in the JD
+- IMPLICIT keywords: technologies that are obviously required but not spelled out (e.g., "distributed systems" implies Kafka, gRPC, or service mesh; "cloud infrastructure" implies Terraform/IaC; "observability" implies Prometheus, Grafana, or Datadog; "CI/CD" implies Jenkins, GitHub Actions, or ArgoCD)
+
+STEP 2 — PLACE KEYWORDS IN HOT EYEBALL ZONES:
+Recruiters read resumes in an F-pattern. These are the hot zones, in priority order:
+1. PROFESSIONAL SUMMARY (read by 100% of recruiters): Must contain the top 5-7 JD keywords naturally woven into 2-3 sentences. Include the exact role title or a close variant. Mention the primary cloud platform and key technologies.
+2. TECHNICAL SKILLS SECTION (scanned by 90%): List JD-required technologies FIRST in each category. Every explicit JD keyword must appear here.
+3. FIRST BULLET OF EACH ROLE (read by 80%): Must contain 2-3 of the highest-priority JD keywords. This is where the recruiter decides "match" or "skip".
+4. SECOND BULLET OF EACH ROLE (read by 50%): Must contain different JD keywords than bullet 1, covering the next tier of requirements.
+5. REMAINING BULLETS: Distribute remaining JD keywords so every keyword appears at least once across the resume.
+
+STEP 3 — VERIFY BEFORE RETURNING:
+After generating the full resume JSON, mentally scan it against the JD keyword list. If ANY explicit JD keyword is missing from the resume, add it to an appropriate bullet or the skills section. Zero misses.
+
+IMPLICIT KEYWORD RULES:
+- If the JD says "distributed systems" → include at least 2 of: Kafka, gRPC, service mesh, event-driven, message queue
+- If the JD says "cloud infrastructure" → include at least 2 of: Terraform, Pulumi, CloudFormation, IaC
+- If the JD says "observability" → include at least 2 of: Prometheus, Grafana, Datadog, distributed tracing, OpenTelemetry
+- If the JD says "CI/CD" → include at least 1 of: Jenkins, GitHub Actions, ArgoCD, CircleCI
+- If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
+- If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership
+
+KEYWORD AUTHENTICITY:
+Keywords must appear in CONTEXT, not as a list dump. Bad: "Used Kafka, gRPC, Kubernetes, Terraform, and Prometheus". Good: "Built a Kafka-based event pipeline that replaced the polling system three teams had been complaining about". The keyword is there, but it sounds like someone who actually used it.
+`;
 }
 
 function buildAntiSlopPromptSection(mode) {
