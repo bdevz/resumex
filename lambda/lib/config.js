@@ -355,9 +355,23 @@ const ANTI_SLOP = {
     { phrase: "state-of-the-art", severity: "hard" },
     { phrase: "in today's fast-paced", severity: "hard" },
     { phrase: "at the forefront of", severity: "hard" },
+    // Found in baseline tests — summary clichés
+    { phrase: "proven track record", severity: "hard" },
+    { phrase: "deep expertise", severity: "hard" },
+    { phrase: "track record of", severity: "hard" },
+    { phrase: "known for", severity: "hard" },
+    { phrase: "at scale", severity: "soft" },
     { phrase: "end-to-end", severity: "soft" },
     { phrase: "above and beyond", severity: "soft" },
     { phrase: "key stakeholders", severity: "soft" },
+    // Found in baseline tests — trailing clause clichés
+    { phrase: "enabling faster", severity: "hard" },
+    { phrase: "enabling teams", severity: "hard" },
+    { phrase: "ensuring compliance", severity: "hard" },
+    { phrase: "improving developer", severity: "hard" },
+    { phrase: "accelerating the team", severity: "hard" },
+    { phrase: "establishing best practices", severity: "hard" },
+    { phrase: "standardizing communication patterns", severity: "hard" },
   ],
 
   structural_patterns: [
@@ -370,9 +384,9 @@ const ANTI_SLOP = {
     },
     {
       name: "trailing_ing_clause",
-      description: "Dangling -ing clause tacked onto the end that adds no specifics",
-      example_bad: "Migrated 12 services to Kubernetes, ensuring high availability and compliance",
-      example_good: "Migrated 12 services to Kubernetes — two of them had zero-downtime requirements that forced us to run blue-green deploys for 3 weeks",
+      description: "CRITICAL: Ending a bullet with ', enabling...', ', reducing...', ', improving...', ', ensuring...', ', establishing...', ', standardizing...', ', accelerating...' or any other dangling -ing clause. This is the MOST COMMON AI tell found in testing. At least 2-3 bullets per role MUST NOT end with a participial clause.",
+      example_bad: "Led migration to microservices, reducing deploy times and enabling independent releases",
+      example_good: "Led migration to microservices. Deploy times dropped from 2 hours to 15 minutes.",
       severity: "hard",
     },
     {
@@ -384,9 +398,9 @@ const ANTI_SLOP = {
     },
     {
       name: "every_bullet_has_metric",
-      description: "When every single bullet in a role has a percentage, dollar amount, or numeric comparison — this is the #1 sign of an AI resume",
-      example_bad: "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms...",
-      example_good: "4 out of 6 bullets have metrics. The rest describe what was built and why it mattered.",
+      description: "CRITICAL: When every single bullet in a role has a percentage, dollar amount, or numeric comparison — this is the #1 sign of an AI resume. STRICTLY ENFORCE: for each role, at least 2 bullets MUST have ZERO numbers, ZERO percentages, ZERO dollar amounts. These bullets should describe what was built, how it worked, or what problem it solved — in plain words only.",
+      example_bad: "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms... (every single bullet has a number)",
+      example_good: "4 out of 6 bullets have metrics. The other 2 say things like 'Owned the on-call rotation for the payments team — wrote the runbook that new engineers still use' (no numbers, just real context).",
       severity: "hard",
     },
     {
@@ -397,6 +411,27 @@ const ANTI_SLOP = {
       severity: "hard",
     },
   ],
+
+  // --- Verb overuse limits ---
+  verb_overuse: {
+    description: "Do NOT start more than 2 bullets across the entire resume with the same verb. Vary your verbs. 'Architected' and 'Designed' are especially overused by AI — use 'Built', 'Set up', 'Wrote', 'Put together', or 'Created' instead for most bullets.",
+    max_per_verb: 2,
+  },
+
+  // --- Summary anti-patterns ---
+  summary_rules: {
+    description: "The professional summary must NOT follow the AI template of '[N]+ years of experience [verb]-ing [buzzwords] at scale'. Write it like a human would: mention what you're good at, what kind of problems you like, or what you're looking for — not a keyword dump.",
+    banned_patterns: [
+      "[N]+ years of experience [verb]-ing",
+      "Proven track record of/in",
+      "Deep expertise in",
+      "Known for [verb]-ing",
+      "passionate about",
+      "with a strong focus on",
+    ],
+    example_bad: "Staff-level platform engineer with 7+ years of experience designing distributed systems at scale. Proven track record leading microservices migrations. Deep expertise in Java, Go, and Kubernetes.",
+    example_good: "I've spent most of my career making backend systems faster and less painful to deploy. Currently at Stripe working on payment infrastructure. Before that, I helped Airbnb's search team ship ranking models. I like hard infrastructure problems and teams that ship daily.",
+  },
 
   examples: [
     {

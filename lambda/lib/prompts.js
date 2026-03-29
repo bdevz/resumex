@@ -638,9 +638,26 @@ function buildAntiSlopPromptSection(mode) {
     section += `  GOOD: "${pat.example_good}"\n`;
   }
 
-  section += `\nMETRIC RATIO: ${ratio.description}.\n`;
-  section += `The remaining bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons.\n`;
-  section += `Instead, describe WHAT you built, HOW it worked, or WHY it mattered — in plain language.\n`;
+  section += `\nMETRIC RATIO (STRICTLY ENFORCED): ${ratio.description}.\n`;
+  section += `HARD RULE: For each role, at least 2 bullets MUST contain ZERO numbers, ZERO percentages, ZERO dollar amounts, ZERO "X to Y" comparisons.\n`;
+  section += `These no-metric bullets should describe WHAT you built, HOW it worked, or WHY it mattered — in plain words only.\n`;
+  section += `Example no-metric bullet: "Owned the on-call rotation for the payments team — wrote the runbook that new engineers still use"\n`;
+
+  // Verb overuse
+  if (slop.verb_overuse) {
+    section += `\nVERB VARIETY (STRICTLY ENFORCED): ${slop.verb_overuse.description}\n`;
+    section += `Maximum ${slop.verb_overuse.max_per_verb} bullets across the ENTIRE resume may start with the same verb.\n`;
+  }
+
+  // Summary rules
+  if (slop.summary_rules) {
+    section += `\nPROFESSIONAL SUMMARY RULES:\n`;
+    section += slop.summary_rules.description + "\n";
+    section += `NEVER start with these patterns:\n`;
+    section += slop.summary_rules.banned_patterns.map(p => `- "${p}"`).join("\n") + "\n";
+    section += `  BAD: "${slop.summary_rules.example_bad}"\n`;
+    section += `  GOOD: "${slop.summary_rules.example_good}"\n`;
+  }
 
   section += `\nEXAMPLES — LEARN THE DIFFERENCE:\n`;
   for (const ex of slop.examples) {
@@ -654,6 +671,7 @@ function buildAntiSlopPromptSection(mode) {
   section += `- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)\n`;
   section += `- Some bullets: Start with the impact/scale, then explain how\n`;
   section += `- Some bullets: Lead with the technology choice, then show the outcome\n`;
+  section += `- Some bullets: End with a period after the main clause. Do NOT tack on a trailing participial phrase.\n`;
 
   return section;
 }
