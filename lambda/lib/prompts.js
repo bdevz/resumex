@@ -254,6 +254,20 @@ function scoreResume(resumeData) {
       bulletCount++;
     }
 
+    // Role-level penalty: if every bullet in a role has a number, penalize all of them
+    const rolePenalties = config.QUALITY_SCORING.role_level_penalties;
+    if (rolePenalties && companyResult.bullets.length >= 3) {
+      const hasNumber = /\d/;
+      const allHaveMetrics = companyResult.bullets.every(b => hasNumber.test(b.text));
+      if (allHaveMetrics) {
+        for (const b of companyResult.bullets) {
+          b.score = Math.max(0, b.score + rolePenalties.all_metrics_penalty_per_bullet);
+          b.breakdown.push(rolePenalties.all_metrics_label);
+          totalScore += rolePenalties.all_metrics_penalty_per_bullet;
+        }
+      }
+    }
+
     // Check if first 2 bullets are strong (skimmability warning)
     const firstTwo = companyResult.bullets.slice(0, 2);
     const weakLeaders = firstTwo.filter(b => b.score < config.QUALITY_SCORING.thresholds.good);
@@ -315,6 +329,26 @@ function scoreBullet(bullet) {
   if (bullet.length > 220) {
     score += config.QUALITY_SCORING.over_200_chars_penalty;
     breakdown.push("Too long (penalty)");
+  }
+
+  // Anti-slop penalties
+  if (config.QUALITY_SCORING.slop_penalties) {
+    for (const rule of config.QUALITY_SCORING.slop_penalties) {
+      if (rule.pattern.test(bullet)) {
+        score += rule.points;
+        breakdown.push(rule.label);
+      }
+    }
+  }
+
+  // Authenticity bonuses
+  if (config.QUALITY_SCORING.authenticity_bonuses) {
+    for (const rule of config.QUALITY_SCORING.authenticity_bonuses) {
+      if (rule.pattern.test(bullet)) {
+        score += rule.points;
+        breakdown.push(rule.label);
+      }
+    }
   }
 
   // Determine grade

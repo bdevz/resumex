@@ -207,6 +207,40 @@ const QUALITY_SCORING = {
   verb_check_points: 1,
   no_metric_penalty: 0,
   over_200_chars_penalty: -1,
+
+  // --- Anti-slop penalties (deducted from bullet score) ---
+  slop_penalties: [
+    // Banned words from ANTI_SLOP config (hard severity)
+    { pattern: /\b(?:delve|pivotal|underscore|landscape|foster|testament|leverage[ds]?|leveraging|spearhead(?:ed|ing)?|harness(?:ed|ing)?|elevat(?:e[ds]?|ing)|bolster(?:ed|ing)?|utiliz(?:e[ds]?|ing)|tapestry|intricate|groundbreaking|transformative|innovative|revolutioniz(?:e[ds]?|ing)|synergy|paradigm)\b/i, points: -3, label: "AI buzzword (hard ban)" },
+    // Banned words (soft severity)
+    { pattern: /\b(?:robust|seamless|comprehensive|cutting[\s-]?edge|world[\s-]?class|best[\s-]?in[\s-]?class|holistic)\b/i, points: -1, label: "AI buzzword (soft ban)" },
+    // Trailing -ing clause: bullet ends with ", [verb]ing ..."
+    { pattern: /,\s+(?:enabling|ensuring|improving|reducing|establishing|standardizing|accelerating|driving|achieving|enhancing|facilitating|streamlining|optimizing|maximizing|empowering|fostering)\b.*$/i, points: -2, label: "trailing -ing clause" },
+    // Adjective triplet: "scalable, resilient, and performant"
+    { pattern: /\w+,\s+\w+,\s+and\s+\w+\s+(?:system|platform|architecture|solution|framework|infrastructure|pipeline|service)/i, points: -2, label: "adjective triplet" },
+    // Metric stacking: 3+ numbers in one bullet
+    { pattern: /\d.*\d.*\d.*\d/i, points: -1, label: "metric stacking (4+ numbers)" },
+    // Generic filler phrases
+    { pattern: /\b(?:proven track record|deep expertise|track record of|passionate about|with a strong focus on|known for)\b/i, points: -2, label: "generic filler phrase" },
+  ],
+
+  // --- Authenticity bonuses (rewarded for human signals) ---
+  authenticity_bonuses: [
+    // Specific pain point or story detail (casual/human phrasing)
+    { pattern: /\b(?:the (?:tricky|hard|annoying|painful|messy) part|kept breaking|silently fail|stopped? (?:working|crashing)|workaround|hack that|still use[ds]?|ended up)\b/i, points: 2, label: "specific pain point (human voice)" },
+    // Mentions a specific team or person by role
+    { pattern: /\b(?:the \w+ team|on-call|oncall|our team|my team|the team)\b/i, points: 1, label: "team context (human voice)" },
+    // Short, punchy bullet (under 120 chars) with substance
+    { pattern: /^.{40,120}$/i, points: 1, label: "concise bullet" },
+  ],
+
+  // --- Role-level penalties (applied in scoreResume, not scoreBullet) ---
+  role_level_penalties: {
+    // If every bullet in a role has a number, penalize each bullet by this amount
+    all_metrics_penalty_per_bullet: -1,
+    all_metrics_label: "every bullet has a metric (AI pattern)",
+  },
+
   thresholds: {
     excellent: 7,
     good: 5,
