@@ -670,6 +670,14 @@ IMPLICIT KEYWORD RULES:
 - If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
 - If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership
 
+ZERO MISSES ON EXPLICIT KEYWORDS:
+Every technology, tool, or framework that is explicitly named in the JD MUST appear somewhere in the resume — no exceptions, even for "nice to have" items. If the JD says "Pulumi", the word "Pulumi" must appear. If the JD says "Datadog", the word "Datadog" must appear. Do not paraphrase or substitute — use the exact term. Niche and rare technologies are especially important because they are the strongest signal to a recruiter that this candidate is a match. A recruiter who sees a rare keyword like "Pulumi" or "service mesh" in both the JD and the resume will immediately flag the candidate as a fit. Missing even one explicit keyword can cause an ATS rejection.
+
+Where to place explicit keywords that don't fit naturally into bullets:
+1. First choice: weave into a bullet with real context ("Wrote Pulumi modules to replace the team's aging CloudFormation templates")
+2. Second choice: include in the Technical Skills section
+3. Last resort: mention in the professional summary
+
 KEYWORD AUTHENTICITY:
 Keywords must appear in CONTEXT, not as a list dump. Bad: "Used Kafka, gRPC, Kubernetes, Terraform, and Prometheus". Good: "Built a Kafka-based event pipeline that replaced the polling system three teams had been complaining about". The keyword is there, but it sounds like someone who actually used it.
 `;
