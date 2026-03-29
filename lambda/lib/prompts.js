@@ -64,26 +64,9 @@ BULLET REQUIREMENTS:
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 200 characters)
 - Focus on achievements, not responsibilities
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
 - Use digits instead of spelling out numbers (8 not "eight")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume — when EVERY bullet has a percentage or dollar amount.
-- Maximum 4 bullets per role should have hard metrics (%, $, from-X-to-Y comparisons)
-- The remaining bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons
-- Instead, those bullets should describe WHAT you built, HOW it worked, or WHY it mattered — in plain language
-
-Example of a GOOD non-metric bullet: "Designed a caching layer using Redis to serve frequently accessed legal documents without hitting the database on every request"
-Example of a GOOD non-metric bullet: "Built an internal CLI tool that automated sandbox provisioning, replacing a 15-step manual process the team had been doing since launch"
-Example of a BAD pattern (every bullet has numbers): "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms..." — this reads like AI slop.
-
-A resume that reads like a human wrote it stands out.
-
+${buildKeywordPlacementSection()}
+${buildAntiSlopPromptSection("standard")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Hiring managers spend 6 seconds scanning a resume. The first 2 bullets of each role are the ONLY ones most will read.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE (how many users/systems/teams), IMPACT (business outcome), and LEADERSHIP
@@ -173,22 +156,10 @@ BULLET REQUIREMENTS:
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 250 characters for XL mode)
 - Focus on achievements, not responsibilities
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
 - Use digits instead of spelling out numbers
 - NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-CRITICAL: NOT every bullet needs numbers. This is the #1 sign of an AI-generated resume.
-With 10-15 bullets per role, maximum 5 should have hard metrics (%, $, from-X-to-Y).
-The remaining 5-10 bullets MUST NOT contain percentages, dollar amounts, or numeric comparisons.
-Instead, describe WHAT you built, HOW it worked, or WHY it mattered — in plain language.
-A resume that reads like a human wrote it stands out.
-
+${buildKeywordPlacementSection()}
+${buildAntiSlopPromptSection("xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 The first 3 bullets of each role are the ONLY ones most hiring managers will read.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
@@ -285,6 +256,20 @@ function scoreResume(resumeData) {
       bulletCount++;
     }
 
+    // Role-level penalty: if every bullet in a role has a number, penalize all of them
+    const rolePenalties = config.QUALITY_SCORING.role_level_penalties;
+    if (rolePenalties && companyResult.bullets.length >= 3) {
+      const hasNumber = /\d/;
+      const allHaveMetrics = companyResult.bullets.every(b => hasNumber.test(b.text));
+      if (allHaveMetrics) {
+        for (const b of companyResult.bullets) {
+          b.score = Math.max(0, b.score + rolePenalties.all_metrics_penalty_per_bullet);
+          b.breakdown.push(rolePenalties.all_metrics_label);
+          totalScore += rolePenalties.all_metrics_penalty_per_bullet;
+        }
+      }
+    }
+
     // Check if first 2 bullets are strong (skimmability warning)
     const firstTwo = companyResult.bullets.slice(0, 2);
     const weakLeaders = firstTwo.filter(b => b.score < config.QUALITY_SCORING.thresholds.good);
@@ -346,6 +331,26 @@ function scoreBullet(bullet) {
   if (bullet.length > 220) {
     score += config.QUALITY_SCORING.over_200_chars_penalty;
     breakdown.push("Too long (penalty)");
+  }
+
+  // Anti-slop penalties
+  if (config.QUALITY_SCORING.slop_penalties) {
+    for (const rule of config.QUALITY_SCORING.slop_penalties) {
+      if (rule.pattern.test(bullet)) {
+        score += rule.points;
+        breakdown.push(rule.label);
+      }
+    }
+  }
+
+  // Authenticity bonuses
+  if (config.QUALITY_SCORING.authenticity_bonuses) {
+    for (const rule of config.QUALITY_SCORING.authenticity_bonuses) {
+      if (rule.pattern.test(bullet)) {
+        score += rule.points;
+        breakdown.push(rule.label);
+      }
+    }
   }
 
   // Determine grade
@@ -505,17 +510,8 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood). Use direct verbs (Built, Designed, Developed, Led, Reduced, Improved)
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same XYZ formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-- 3-4 bullets per role should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
-A resume that reads like a human wrote it stands out.
-
+${buildKeywordPlacementSection()}
+${buildAntiSlopPromptSection("optimize")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 When rewriting bullets, place the strongest rewritten bullets FIRST in each role.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE, IMPACT, and LEADERSHIP
@@ -610,16 +606,8 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
-- Avoid excessive adjectives/adverbs (no "strategically", "innovatively", "meticulously")
-
-WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:
-Do NOT write every bullet in the same formula pattern. Mix sentence structures naturally:
-- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)
-- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)
-- Some bullets: Start with the impact/scale, then explain how
-- Some bullets: Lead with the technology choice, then show the outcome
-With 10-15 bullets per role, 5-7 should have hard metrics. The rest can show scope, scale, business context, or technical decisions without forcing numbers.
-
+${buildKeywordPlacementSection()}
+${buildAntiSlopPromptSection("optimize-xl")}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Place the strongest rewritten bullets FIRST in each role.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
@@ -653,6 +641,121 @@ function buildOptimizeUserMessage(resume, jd, context) {
   return message;
 }
 
+function buildKeywordPlacementSection() {
+  return `
+KEYWORD PLACEMENT — 100% MATCH IS NON-NEGOTIABLE:
+The resume MUST contain every single technology, tool, framework, methodology, and requirement mentioned in the JD. A recruiter scanning this resume should think "this candidate is a perfect fit" within 6 seconds.
+
+STEP 1 — EXTRACT ALL KEYWORDS FROM THE JD:
+Before writing anything, identify two categories:
+- EXPLICIT keywords: every technology, tool, language, framework, methodology, certification, and domain term that appears literally in the JD
+- IMPLICIT keywords: technologies that are obviously required but not spelled out (e.g., "distributed systems" implies Kafka, gRPC, or service mesh; "cloud infrastructure" implies Terraform/IaC; "observability" implies Prometheus, Grafana, or Datadog; "CI/CD" implies Jenkins, GitHub Actions, or ArgoCD)
+
+STEP 2 — PLACE KEYWORDS IN HOT EYEBALL ZONES:
+Recruiters read resumes in an F-pattern. These are the hot zones, in priority order:
+1. PROFESSIONAL SUMMARY (read by 100% of recruiters): Must contain the top 5-7 JD keywords naturally woven into 2-3 sentences. Include the exact role title or a close variant. Mention the primary cloud platform and key technologies.
+2. TECHNICAL SKILLS SECTION (scanned by 90%): List JD-required technologies FIRST in each category. Every explicit JD keyword must appear here.
+3. FIRST BULLET OF EACH ROLE (read by 80%): Must contain 2-3 of the highest-priority JD keywords. This is where the recruiter decides "match" or "skip".
+4. SECOND BULLET OF EACH ROLE (read by 50%): Must contain different JD keywords than bullet 1, covering the next tier of requirements.
+5. REMAINING BULLETS: Distribute remaining JD keywords so every keyword appears at least once across the resume.
+
+STEP 3 — VERIFY BEFORE RETURNING:
+After generating the full resume JSON, mentally scan it against the JD keyword list. If ANY explicit JD keyword is missing from the resume, add it to an appropriate bullet or the skills section. Zero misses.
+
+IMPLICIT KEYWORD RULES:
+- If the JD says "distributed systems" → include at least 2 of: Kafka, gRPC, service mesh, event-driven, message queue
+- If the JD says "cloud infrastructure" → include at least 2 of: Terraform, Pulumi, CloudFormation, IaC
+- If the JD says "observability" → include at least 2 of: Prometheus, Grafana, Datadog, distributed tracing, OpenTelemetry
+- If the JD says "CI/CD" → include at least 1 of: Jenkins, GitHub Actions, ArgoCD, CircleCI
+- If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
+- If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership
+
+ZERO MISSES ON EXPLICIT KEYWORDS:
+Every technology, tool, or framework that is explicitly named in the JD MUST appear somewhere in the resume — no exceptions, even for "nice to have" items. If the JD says "Pulumi", the word "Pulumi" must appear. If the JD says "Datadog", the word "Datadog" must appear. Do not paraphrase or substitute — use the exact term. Niche and rare technologies are especially important because they are the strongest signal to a recruiter that this candidate is a match. A recruiter who sees a rare keyword like "Pulumi" or "service mesh" in both the JD and the resume will immediately flag the candidate as a fit. Missing even one explicit keyword can cause an ATS rejection.
+
+Where to place explicit keywords that don't fit naturally into bullets:
+1. First choice: weave into a bullet with real context ("Wrote Pulumi modules to replace the team's aging CloudFormation templates")
+2. Second choice: include in the Technical Skills section
+3. Last resort: mention in the professional summary
+
+KEYWORD AUTHENTICITY:
+Keywords must appear in CONTEXT, not as a list dump. Bad: "Used Kafka, gRPC, Kubernetes, Terraform, and Prometheus". Good: "Built a Kafka-based event pipeline that replaced the polling system three teams had been complaining about". The keyword is there, but it sounds like someone who actually used it.
+`;
+}
+
+function buildAntiSlopPromptSection(mode) {
+  const slop = config.ANTI_SLOP;
+
+  const hardWords = slop.banned_words.filter(w => w.severity === "hard").map(w => w.word);
+  const softWords = slop.banned_words.filter(w => w.severity === "soft").map(w => w.word);
+  const hardPhrases = slop.banned_phrases.filter(p => p.severity === "hard").map(p => p.phrase);
+  const softPhrases = slop.banned_phrases.filter(p => p.severity === "soft").map(p => p.phrase);
+
+  const ratio = slop.max_metric_ratio[mode] || slop.max_metric_ratio.standard;
+
+  let section = `\nWRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:\n`;
+  section += slop.tone + "\n";
+
+  section += `\nNEVER use these words — they are the #1 signal of AI-generated writing:\n`;
+  section += hardWords.join(", ") + "\n";
+
+  section += `\nAvoid these words when possible:\n`;
+  section += softWords.join(", ") + "\n";
+
+  section += `\nNEVER use these phrase patterns:\n`;
+  section += hardPhrases.map(p => `- "${p}"`).join("\n") + "\n";
+
+  if (softPhrases.length > 0) {
+    section += `\nAvoid these phrases when possible:\n`;
+    section += softPhrases.map(p => `- "${p}"`).join("\n") + "\n";
+  }
+
+  section += `\nSTRUCTURAL ANTI-PATTERNS TO AVOID:\n`;
+  for (const pat of slop.structural_patterns) {
+    const verb = pat.severity === "hard" ? "NEVER" : "Avoid";
+    section += `\n${verb}: ${pat.description}\n`;
+    section += `  BAD: "${pat.example_bad}"\n`;
+    section += `  GOOD: "${pat.example_good}"\n`;
+  }
+
+  section += `\nMETRIC RATIO (STRICTLY ENFORCED): ${ratio.description}.\n`;
+  section += `HARD RULE: For each role, at least 2 bullets MUST contain ZERO numbers, ZERO percentages, ZERO dollar amounts, ZERO "X to Y" comparisons.\n`;
+  section += `These no-metric bullets should describe WHAT you built, HOW it worked, or WHY it mattered — in plain words only.\n`;
+  section += `Example no-metric bullet: "Owned the on-call rotation for the payments team — wrote the runbook that new engineers still use"\n`;
+
+  // Verb overuse
+  if (slop.verb_overuse) {
+    section += `\nVERB VARIETY (STRICTLY ENFORCED): ${slop.verb_overuse.description}\n`;
+    section += `Maximum ${slop.verb_overuse.max_per_verb} bullets across the ENTIRE resume may start with the same verb.\n`;
+  }
+
+  // Summary rules
+  if (slop.summary_rules) {
+    section += `\nPROFESSIONAL SUMMARY RULES:\n`;
+    section += slop.summary_rules.description + "\n";
+    section += `NEVER start with these patterns:\n`;
+    section += slop.summary_rules.banned_patterns.map(p => `- "${p}"`).join("\n") + "\n";
+    section += `  BAD: "${slop.summary_rules.example_bad}"\n`;
+    section += `  GOOD: "${slop.summary_rules.example_good}"\n`;
+  }
+
+  section += `\nEXAMPLES — LEARN THE DIFFERENCE:\n`;
+  for (const ex of slop.examples) {
+    section += `\n  BAD: "${ex.bad}"\n`;
+    section += `  GOOD: "${ex.good}"\n`;
+    section += `  WHY: ${ex.why}\n`;
+  }
+
+  section += `\nMix sentence structures naturally — do NOT write every bullet in the same pattern:\n`;
+  section += `- Some bullets: "Accomplished [X] by doing [Y], resulting in [Z]" (XYZ)\n`;
+  section += `- Some bullets: "Faced [challenge], took [action], achieved [result]" (CAR)\n`;
+  section += `- Some bullets: Start with the impact/scale, then explain how\n`;
+  section += `- Some bullets: Lead with the technology choice, then show the outcome\n`;
+  section += `- Some bullets: End with a period after the main clause. Do NOT tack on a trailing participial phrase.\n`;
+
+  return section;
+}
+
 module.exports = {
   buildSystemPrompt,
   buildSystemPromptXL,
@@ -660,6 +763,7 @@ module.exports = {
   buildOptimizeSystemPrompt,
   buildOptimizeSystemPromptXL,
   buildOptimizeUserMessage,
+  buildAntiSlopPromptSection,
   scoreResume,
   validateTimeline
 };

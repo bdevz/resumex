@@ -207,6 +207,40 @@ const QUALITY_SCORING = {
   verb_check_points: 1,
   no_metric_penalty: 0,
   over_200_chars_penalty: -1,
+
+  // --- Anti-slop penalties (deducted from bullet score) ---
+  slop_penalties: [
+    // Banned words from ANTI_SLOP config (hard severity)
+    { pattern: /\b(?:delve|pivotal|underscore|landscape|foster|testament|leverage[ds]?|leveraging|spearhead(?:ed|ing)?|harness(?:ed|ing)?|elevat(?:e[ds]?|ing)|bolster(?:ed|ing)?|utiliz(?:e[ds]?|ing)|tapestry|intricate|groundbreaking|transformative|innovative|revolutioniz(?:e[ds]?|ing)|synergy|paradigm)\b/i, points: -3, label: "AI buzzword (hard ban)" },
+    // Banned words (soft severity)
+    { pattern: /\b(?:robust|seamless|comprehensive|cutting[\s-]?edge|world[\s-]?class|best[\s-]?in[\s-]?class|holistic)\b/i, points: -1, label: "AI buzzword (soft ban)" },
+    // Trailing -ing clause: bullet ends with ", [verb]ing ..."
+    { pattern: /,\s+(?:enabling|ensuring|improving|reducing|establishing|standardizing|accelerating|driving|achieving|enhancing|facilitating|streamlining|optimizing|maximizing|empowering|fostering)\b.*$/i, points: -2, label: "trailing -ing clause" },
+    // Adjective triplet: "scalable, resilient, and performant"
+    { pattern: /\w+,\s+\w+,\s+and\s+\w+\s+(?:system|platform|architecture|solution|framework|infrastructure|pipeline|service)/i, points: -2, label: "adjective triplet" },
+    // Metric stacking: 3+ numbers in one bullet
+    { pattern: /\d.*\d.*\d.*\d/i, points: -1, label: "metric stacking (4+ numbers)" },
+    // Generic filler phrases
+    { pattern: /\b(?:proven track record|deep expertise|track record of|passionate about|with a strong focus on|known for)\b/i, points: -2, label: "generic filler phrase" },
+  ],
+
+  // --- Authenticity bonuses (rewarded for human signals) ---
+  authenticity_bonuses: [
+    // Specific pain point or story detail (casual/human phrasing)
+    { pattern: /\b(?:the (?:tricky|hard|annoying|painful|messy) part|kept breaking|silently fail|stopped? (?:working|crashing)|workaround|hack that|still use[ds]?|ended up)\b/i, points: 2, label: "specific pain point (human voice)" },
+    // Mentions a specific team or person by role
+    { pattern: /\b(?:the \w+ team|on-call|oncall|our team|my team|the team)\b/i, points: 1, label: "team context (human voice)" },
+    // Short, punchy bullet (under 120 chars) with substance
+    { pattern: /^.{40,120}$/i, points: 1, label: "concise bullet" },
+  ],
+
+  // --- Role-level penalties (applied in scoreResume, not scoreBullet) ---
+  role_level_penalties: {
+    // If every bullet in a role has a number, penalize each bullet by this amount
+    all_metrics_penalty_per_bullet: -1,
+    all_metrics_label: "every bullet has a metric (AI pattern)",
+  },
+
   thresholds: {
     excellent: 7,
     good: 5,
@@ -312,6 +346,158 @@ const SOFT_SKILL_RULES = {
   min_mentoring_per_senior_role: 1,
 };
 
+// --- Anti-AI-slop writing rules (config-driven, injected into all prompts) ---
+const ANTI_SLOP = {
+  banned_words: [
+    { word: "delve", severity: "hard" },
+    { word: "pivotal", severity: "hard" },
+    { word: "underscore", severity: "hard" },
+    { word: "landscape", severity: "hard" },
+    { word: "foster", severity: "hard" },
+    { word: "testament", severity: "hard" },
+    { word: "leverage", severity: "hard" },
+    { word: "spearhead", severity: "hard" },
+    { word: "harness", severity: "hard" },
+    { word: "elevate", severity: "hard" },
+    { word: "bolster", severity: "hard" },
+    { word: "utilize", severity: "hard" },
+    { word: "tapestry", severity: "hard" },
+    { word: "intricate", severity: "hard" },
+    { word: "groundbreaking", severity: "hard" },
+    { word: "transformative", severity: "hard" },
+    { word: "innovative", severity: "hard" },
+    { word: "revolutionize", severity: "hard" },
+    { word: "synergy", severity: "hard" },
+    { word: "paradigm", severity: "hard" },
+    { word: "robust", severity: "soft" },
+    { word: "seamless", severity: "soft" },
+    { word: "comprehensive", severity: "soft" },
+    { word: "cutting-edge", severity: "soft" },
+    { word: "world-class", severity: "soft" },
+    { word: "best-in-class", severity: "soft" },
+    { word: "holistic", severity: "soft" },
+  ],
+
+  banned_phrases: [
+    { phrase: "not just X, but Y", severity: "hard" },
+    { phrase: "plays a vital role", severity: "hard" },
+    { phrase: "stands as a testament", severity: "hard" },
+    { phrase: "it's important to note", severity: "hard" },
+    { phrase: "from X to Y (rhetorical, not metric)", severity: "hard" },
+    { phrase: "driving innovation", severity: "hard" },
+    { phrase: "ensuring seamless", severity: "hard" },
+    { phrase: "state-of-the-art", severity: "hard" },
+    { phrase: "in today's fast-paced", severity: "hard" },
+    { phrase: "at the forefront of", severity: "hard" },
+    // Found in baseline tests — summary clichés
+    { phrase: "proven track record", severity: "hard" },
+    { phrase: "deep expertise", severity: "hard" },
+    { phrase: "track record of", severity: "hard" },
+    { phrase: "known for", severity: "hard" },
+    { phrase: "at scale", severity: "soft" },
+    { phrase: "end-to-end", severity: "soft" },
+    { phrase: "above and beyond", severity: "soft" },
+    { phrase: "key stakeholders", severity: "soft" },
+    // Found in baseline tests — trailing clause clichés
+    { phrase: "enabling faster", severity: "hard" },
+    { phrase: "enabling teams", severity: "hard" },
+    { phrase: "ensuring compliance", severity: "hard" },
+    { phrase: "improving developer", severity: "hard" },
+    { phrase: "accelerating the team", severity: "hard" },
+    { phrase: "establishing best practices", severity: "hard" },
+    { phrase: "standardizing communication patterns", severity: "hard" },
+  ],
+
+  structural_patterns: [
+    {
+      name: "adjective_triplet",
+      description: "Three adjectives in a row separated by commas",
+      example_bad: "Built a scalable, resilient, and performant API gateway",
+      example_good: "Built an API gateway that handled 50K concurrent connections without falling over",
+      severity: "hard",
+    },
+    {
+      name: "trailing_ing_clause",
+      description: "CRITICAL: Ending a bullet with ', enabling...', ', reducing...', ', improving...', ', ensuring...', ', establishing...', ', standardizing...', ', accelerating...' or any other dangling -ing clause. This is the MOST COMMON AI tell found in testing. At least 2-3 bullets per role MUST NOT end with a participial clause.",
+      example_bad: "Led migration to microservices, reducing deploy times and enabling independent releases",
+      example_good: "Led migration to microservices. Deploy times dropped from 2 hours to 15 minutes.",
+      severity: "hard",
+    },
+    {
+      name: "em_dash_overuse",
+      description: "More than one em dash in a single bullet",
+      example_bad: "Designed a caching layer — Redis-based — that reduced latency — improving UX significantly",
+      example_good: "Designed a Redis caching layer that cut API response times from 1.2s to 180ms",
+      severity: "soft",
+    },
+    {
+      name: "every_bullet_has_metric",
+      description: "CRITICAL: When every single bullet in a role has a percentage, dollar amount, or numeric comparison — this is the #1 sign of an AI resume. STRICTLY ENFORCE: for each role, at least 2 bullets MUST have ZERO numbers, ZERO percentages, ZERO dollar amounts. These bullets should describe what was built, how it worked, or what problem it solved — in plain words only.",
+      example_bad: "Reduced X by 72%... improved Y by 340%... saving $420K... from 1.2s to 180ms... (every single bullet has a number)",
+      example_good: "4 out of 6 bullets have metrics. The other 2 say things like 'Owned the on-call rotation for the payments team — wrote the runbook that new engineers still use' (no numbers, just real context).",
+      severity: "hard",
+    },
+    {
+      name: "metric_stacking",
+      description: "Cramming multiple unrelated metrics into one bullet",
+      example_bad: "Reduced latency by 40%, increased throughput by 200%, saving $1.2M annually while improving NPS by 15 points",
+      example_good: "Reduced API latency by 40% by adding a Redis read-through cache in front of the payments table",
+      severity: "hard",
+    },
+  ],
+
+  // --- Verb overuse limits ---
+  verb_overuse: {
+    description: "Do NOT start more than 2 bullets across the entire resume with the same verb. Vary your verbs. 'Architected' and 'Designed' are especially overused by AI — use 'Built', 'Set up', 'Wrote', 'Put together', or 'Created' instead for most bullets.",
+    max_per_verb: 2,
+  },
+
+  // --- Summary anti-patterns ---
+  summary_rules: {
+    description: "The professional summary must NOT follow the AI template of '[N]+ years of experience [verb]-ing [buzzwords] at scale'. Write it like a human would: mention what you're good at, what kind of problems you like, or what you're looking for — not a keyword dump.",
+    banned_patterns: [
+      "[N]+ years of experience [verb]-ing",
+      "Proven track record of/in",
+      "Deep expertise in",
+      "Known for [verb]-ing",
+      "passionate about",
+      "with a strong focus on",
+    ],
+    example_bad: "Staff-level platform engineer with 7+ years of experience designing distributed systems at scale. Proven track record leading microservices migrations. Deep expertise in Java, Go, and Kubernetes.",
+    example_good: "I've spent most of my career making backend systems faster and less painful to deploy. Currently at Stripe working on payment infrastructure. Before that, I helped Airbnb's search team ship ranking models. I like hard infrastructure problems and teams that ship daily.",
+  },
+
+  examples: [
+    {
+      bad: "Spearheaded a transformative cloud migration initiative leveraging Kubernetes and Terraform, resulting in a 60% reduction in infrastructure costs",
+      good: "Moved 14 services from EC2 to EKS over 4 months — the hardest part was untangling the shared RDS instance that three teams depended on",
+      why: "The bad version uses 'spearheaded', 'transformative', 'leveraging', 'initiative' — four AI tells in one sentence. The good version sounds like someone who actually did the work.",
+    },
+    {
+      bad: "Drove innovation by implementing a robust microservices architecture, ensuring seamless scalability and enhanced system reliability",
+      good: "Broke a Rails monolith into 6 services so deploys stopped taking down the whole app every Thursday",
+      why: "The bad version is all buzzwords. The good version has a specific pain point (Thursday deploys) that no AI would invent.",
+    },
+    {
+      bad: "Leveraged cutting-edge machine learning algorithms to optimize customer engagement metrics, achieving a 45% improvement in retention rates",
+      good: "Built a churn prediction model using XGBoost that flagged at-risk accounts 2 weeks before they cancelled — the CS team used it to save about 30% of them",
+      why: "Specificity beats superlatives. Name the model, name the team, describe the workflow.",
+    },
+  ],
+
+  tone: `Write like a tired engineer updating their resume at 11pm, not like a marketing copywriter.
+Be specific and plain. If something was hard, say it was hard. If the scope was small, don't inflate it.
+A human resume has personality — it mentions the annoying migration, the team that was skeptical, the workaround that became permanent.
+Never make every bullet sound triumphant. Real work is messy.`,
+
+  max_metric_ratio: {
+    standard:      { max: 4, per: "6-8",   description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    xl:            { max: 5, per: "10-15",  description: "At most 5 of 10-15 bullets per role should have hard metrics" },
+    optimize:      { max: 4, per: "6-8",    description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    "optimize-xl": { max: 7, per: "10-15",  description: "At most 5-7 of 10-15 bullets per role should have hard metrics" },
+  },
+};
+
 module.exports = {
   API,
   CONTACT,
@@ -330,4 +516,5 @@ module.exports = {
   TECH_TIMELINE,
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
+  ANTI_SLOP,
 };
