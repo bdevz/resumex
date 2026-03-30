@@ -11,7 +11,7 @@
 #   bash deploy.sh
 #
 # What it creates:
-#   - Lambda function with Function URL (HTTPS endpoint, no API Gateway needed)
+#   - Lambda function with HTTP API Gateway endpoint
 #   - S3 bucket with static website hosting (serves index.html)
 #   - IAM role for Lambda execution
 #
@@ -24,7 +24,9 @@ set -e
 # Change these as needed
 REGION="${AWS_REGION:-us-east-1}"
 FUNCTION_NAME="resume-generator"
-S3_BUCKET="resume-generator-site-$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "change-me")"
+S3_BUCKET="resumex-$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "change-me")"
+CF_DISTRIBUTION_ID="${CF_DISTRIBUTION_ID:-EQ7652SZRP8TB}"
+SITE_URL="https://resumex.okyte.com"
 ROLE_NAME="resume-generator-lambda-role"
 
 echo ""
@@ -154,38 +156,67 @@ LAMBDA_ARN=$(aws lambda create-function \
 
 echo "  Lambda: $LAMBDA_ARN"
 
-# ── Step 4: Create Function URL ──
-echo "[4/6] Creating Lambda Function URL..."
+# ── Step 4: Create HTTP API Gateway ──
+echo "[4/6] Creating HTTP API Gateway..."
 
-LAMBDA_URL=$(aws lambda create-function-url-config \
-  --function-name "$FUNCTION_NAME" \
-  --auth-type "NONE" \
-  --cors '{
-    "AllowOrigins": ["*"],
-    "AllowMethods": ["GET", "POST"],
-    "AllowHeaders": ["Content-Type", "X-Passphrase"],
-    "MaxAge": 86400
-  }' \
-  --region "$REGION" \
-  --query 'FunctionUrl' --output text 2>/dev/null) || \
-LAMBDA_URL=$(aws lambda get-function-url-config \
-  --function-name "$FUNCTION_NAME" \
-  --region "$REGION" \
-  --query 'FunctionUrl' --output text 2>/dev/null)
+API_NAME="${FUNCTION_NAME}-api"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# Remove trailing slash
-LAMBDA_URL="${LAMBDA_URL%/}"
+# Try to find existing API; create if not found
+API_ID=$(aws apigatewayv2 get-apis --region "$REGION" \
+  --query "Items[?Name=='${API_NAME}'].ApiId | [0]" --output text 2>/dev/null)
 
-# Grant public invoke permission for Function URL
-aws lambda add-permission \
-  --function-name "$FUNCTION_NAME" \
-  --statement-id "FunctionURLAllowPublicAccess" \
-  --action "lambda:InvokeFunctionUrl" \
-  --principal "*" \
-  --function-url-auth-type "NONE" \
-  --region "$REGION" 2>/dev/null || true
+if [ "$API_ID" = "None" ] || [ -z "$API_ID" ]; then
+  echo "  Creating new HTTP API..."
+  API_ID=$(aws apigatewayv2 create-api \
+    --name "$API_NAME" \
+    --protocol-type HTTP \
+    --cors-configuration '{
+      "AllowOrigins": ["*"],
+      "AllowMethods": ["GET", "POST", "OPTIONS"],
+      "AllowHeaders": ["Content-Type", "X-Passphrase"],
+      "MaxAge": 86400
+    }' \
+    --region "$REGION" \
+    --query 'ApiId' --output text)
 
-echo "  URL: $LAMBDA_URL"
+  # Create Lambda integration
+  INTEGRATION_ID=$(aws apigatewayv2 create-integration \
+    --api-id "$API_ID" \
+    --integration-type AWS_PROXY \
+    --integration-uri "$LAMBDA_ARN" \
+    --payload-format-version "2.0" \
+    --region "$REGION" \
+    --query 'IntegrationId' --output text)
+
+  # Create default route
+  aws apigatewayv2 create-route \
+    --api-id "$API_ID" \
+    --route-key '$default' \
+    --target "integrations/$INTEGRATION_ID" \
+    --region "$REGION" > /dev/null
+
+  # Create default stage with auto-deploy
+  aws apigatewayv2 create-stage \
+    --api-id "$API_ID" \
+    --stage-name '$default' \
+    --auto-deploy \
+    --region "$REGION" > /dev/null
+
+  # Grant API Gateway permission to invoke Lambda
+  aws lambda add-permission \
+    --function-name "$FUNCTION_NAME" \
+    --statement-id "apigateway-invoke" \
+    --action "lambda:InvokeFunction" \
+    --principal "apigateway.amazonaws.com" \
+    --source-arn "arn:aws:execute-api:${REGION}:${ACCOUNT_ID}:${API_ID}/*" \
+    --region "$REGION" 2>/dev/null || true
+else
+  echo "  Using existing API: $API_ID"
+fi
+
+API_URL="https://${API_ID}.execute-api.${REGION}.amazonaws.com"
+echo "  API URL: $API_URL"
 
 # ── Step 5: Update frontend with Lambda URL and upload to S3 ──
 echo "[5/6] Setting up S3 static website..."
@@ -223,8 +254,8 @@ aws s3api put-bucket-policy --bucket "$S3_BUCKET" --policy "$BUCKET_POLICY" 2>/d
 # Enable static website hosting
 aws s3 website "s3://$S3_BUCKET" --index-document index.html 2>/dev/null
 
-# Inject Lambda URL into frontend
-sed "s|%%API_URL%%|${LAMBDA_URL}|g" frontend/index.html > /tmp/index.html
+# Inject API URL into frontend
+sed "s|%%API_URL%%|${API_URL}|g" frontend/index.html > /tmp/index.html
 
 # Upload HTML
 aws s3 cp /tmp/index.html "s3://$S3_BUCKET/index.html" \
@@ -240,15 +271,52 @@ fi
 S3_URL="http://$S3_BUCKET.s3-website-$REGION.amazonaws.com"
 echo "  S3 Website: $S3_URL"
 
+# Invalidate CloudFront cache if distribution ID is set
+if [ -n "$CF_DISTRIBUTION_ID" ]; then
+  echo "  Invalidating CloudFront cache..."
+  aws cloudfront create-invalidation \
+    --distribution-id "$CF_DISTRIBUTION_ID" \
+    --paths "/*" \
+    --query 'Invalidation.Id' --output text 2>/dev/null || echo "  (CloudFront invalidation failed — check distribution ID)"
+fi
+
 # ── Step 6: Verify ──
 echo "[6/6] Verifying deployment..."
 
-# Test Lambda health
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$LAMBDA_URL/" 2>/dev/null || echo "000")
+# Test API health
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/" 2>/dev/null || echo "000")
 if [ "$HTTP_STATUS" = "200" ]; then
-  echo "  Lambda health check: OK"
+  echo "  API health check: OK"
 else
-  echo "  Lambda health check: $HTTP_STATUS (may need a moment to warm up)"
+  echo "  API health check: $HTTP_STATUS (may need a moment to warm up)"
+fi
+
+# Verify the deployed HTML points to the API Gateway (not a stale Lambda URL)
+DEPLOYED_API=$(curl -s "$S3_URL" 2>/dev/null | grep -o 'API_BASE = "[^"]*"' | head -1)
+if echo "$DEPLOYED_API" | grep -q "execute-api"; then
+  echo "  Frontend API check: OK ($DEPLOYED_API)"
+elif echo "$DEPLOYED_API" | grep -q "lambda-url"; then
+  echo "  WARNING: Frontend still points to a Lambda Function URL!"
+  echo "  $DEPLOYED_API"
+  echo "  This will cause 403 errors. Check the S3 bucket and CloudFront cache."
+fi
+
+# Wait for CloudFront invalidation to propagate, then verify the live site
+if [ -n "$CF_DISTRIBUTION_ID" ]; then
+  echo "  Waiting for CloudFront invalidation (30s)..."
+  sleep 30
+  LIVE_API=$(curl -s "$SITE_URL" 2>/dev/null | grep -o 'API_BASE = "[^"]*"' | head -1)
+  LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL" 2>/dev/null || echo "000")
+  if [ "$LIVE_STATUS" = "200" ] && echo "$LIVE_API" | grep -q "execute-api"; then
+    echo "  Live site check: OK ($SITE_URL)"
+  else
+    echo ""
+    echo "  ⚠ WARNING: $SITE_URL may be serving stale content!"
+    echo "  HTTP status: $LIVE_STATUS"
+    echo "  API_BASE: ${LIVE_API:-not found}"
+    echo "  CloudFront may need more time. Run:"
+    echo "    curl -s $SITE_URL | grep API_BASE"
+  fi
 fi
 
 # Clean up
@@ -258,11 +326,12 @@ echo ""
 echo "================================================================"
 echo "  DEPLOYMENT COMPLETE"
 echo ""
-echo "  Web App:     $S3_URL"
-echo "  Lambda API:  $LAMBDA_URL"
+echo "  Live Site:   $SITE_URL"
+echo "  S3 Origin:   $S3_URL"
+echo "  API:         $API_URL"
 echo "  Passphrase:  $SHARED_PASSPHRASE"
 echo ""
-echo "  Share the Web App URL and passphrase with your team."
+echo "  Share $SITE_URL and the passphrase with your team."
 echo "  That's all they need."
 echo "================================================================"
 echo ""
