@@ -79,6 +79,7 @@ const SHORT_TO_FULL = {
   edu: "education",
   sc: "school",
   dg: "degree",
+  cert: "certifications",
 };
 
 function expandKeys(obj) {

@@ -776,6 +776,7 @@
       <div class="field-group">
         <label>Job Description</label>
         <textarea id="jd-input" placeholder="Paste the full job description here..."></textarea>
+        <p class="field-hint" id="domain-hint" style="display:none;"></p>
       </div>
 
       <div class="two-col">
@@ -793,6 +794,15 @@
             <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
             <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
           </select>
+        </div>
+        <div class="field-group">
+          <label>Ecosystem</label>
+          <select id="domain-select">
+            <option value="software" selected>Software Engineering</option>
+            <option value="salesforce">Salesforce</option>
+            <option value="workday">Workday</option>
+          </select>
+          <p class="field-hint">Tailors keywords, verbs &amp; voice to the ecosystem</p>
         </div>
       </div>
 
@@ -822,6 +832,11 @@
         <label class="edu-toggle">
           <input type="checkbox" id="include-education" checked>
           <span>Include education section</span>
+        </label>
+        <label class="edu-toggle">
+          <input type="checkbox" id="include-certifications">
+          <span>Add certifications</span>
+          <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">(ecosystem-relevant; off by default)</span>
         </label>
       </div>
 
@@ -977,6 +992,40 @@
     document.getElementById("passphrase").addEventListener("keydown", (e) => {
       if (e.key === "Enter") authenticate();
     });
+
+    // Ecosystem detection — advisory hint only; the dropdown always wins.
+    (function () {
+      var SIGNALS = {
+        workday: ["workday","\\beib\\b","core connector","workday studio","birt","calculated field","business process framework","\\bhcm\\b","peci","picof","report writer","prism analytics","workday extend","tenant"],
+        salesforce: ["salesforce","\\bapex\\b","\\bsoql\\b","\\bsosl\\b","lightning web component","\\blwc\\b","visualforce","flow builder","sales cloud","service cloud","experience cloud","\\bcpq\\b","sfdx","trailhead","validation rule","permission set"]
+      };
+      var LABEL = { workday: "Workday", salesforce: "Salesforce" };
+      function detect(jd) {
+        var t = (jd || "").toLowerCase(), best = "software", bestN = 0;
+        for (var d in SIGNALS) {
+          var n = SIGNALS[d].reduce(function (a, s) {
+            return a + ((t.match(new RegExp(s, "g")) || []).length);
+          }, 0);
+          if (n > bestN) { best = d; bestN = n; }
+        }
+        return best;
+      }
+      var jdEl = document.getElementById("jd-input");
+      var hintEl = document.getElementById("domain-hint");
+      var sel = document.getElementById("domain-select");
+      if (!jdEl || !hintEl || !sel) return;
+      function update() {
+        var d = detect(jdEl.value);
+        if (d === "software" || d === sel.value) { hintEl.style.display = "none"; return; }
+        hintEl.style.display = "block";
+        hintEl.innerHTML = 'Looks like a <strong>' + LABEL[d] + '</strong> role. ' +
+          '<a href="#" id="domain-switch" style="color:var(--accent,#4f8cff);">Switch to ' + LABEL[d] + '</a>';
+        var sw = document.getElementById("domain-switch");
+        if (sw) sw.onclick = function (e) { e.preventDefault(); sel.value = d; update(); };
+      }
+      jdEl.addEventListener("input", update);
+      sel.addEventListener("change", update);
+    })();
 
     // ── Template Options ──
     const TEMPLATE_OPTIONS = [
@@ -1251,12 +1300,14 @@
 
       // Build request
       const xlMode = document.getElementById("xl-mode").checked;
+      const domain = document.getElementById("domain-select").value;
+      const includeCertifications = document.getElementById("include-certifications").checked;
       let endpoint, payload;
       if (currentMode === "optimize") {
         endpoint = "/optimize";
         payload = {
           resume: document.getElementById("resume-input").value.trim(),
-          jd, model, xlMode,
+          jd, model, xlMode, domain, includeCertifications,
           context: context || undefined,
         };
       } else {
@@ -1264,7 +1315,7 @@
         const customer = document.getElementById("customer-input").value.trim();
         const companies = getCompaniesData();
         payload = {
-          jd, model, xlMode,
+          jd, model, xlMode, domain, includeCertifications,
           customer: customer || undefined,
           context: context || undefined,
           companies: companies.length > 0 ? companies : undefined,
