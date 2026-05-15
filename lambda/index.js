@@ -183,14 +183,17 @@ function getHeaders(event) {
 // ── Route: POST /analyze ──
 
 async function handleAnalyze(body) {
-  const { jd, customer, context, model: modelInput, xlMode, companies } = body;
+  const { jd, customer, context, model: modelInput, xlMode, companies, domain, includeCertifications } = body;
 
   if (!jd || jd.trim().length < 50) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
-  const systemPrompt = xlMode ? buildSystemPromptXL() : buildSystemPrompt();
-  const userMessage = buildUserMessage(jd, customer, context, companies);
+  const dom = domain || "software";
+  const systemPrompt = xlMode
+    ? buildSystemPromptXL(dom, includeCertifications)
+    : buildSystemPrompt(dom, includeCertifications);
+  const userMessage = buildUserMessage(jd, customer, context, companies, dom);
   const model = resolveModel(modelInput);
 
   // Call Anthropic Messages API (4 min timeout — leaves buffer before Lambda's 5 min limit)
@@ -260,8 +263,8 @@ async function handleAnalyze(body) {
     });
   }
 
-  const scoring = scoreResume(resumeData);
-  const timeline_warnings = validateTimeline(resumeData);
+  const scoring = scoreResume(resumeData, dom);
+  const timeline_warnings = validateTimeline(resumeData, dom);
 
   return response(200, {
     resumeData,
@@ -275,7 +278,7 @@ async function handleAnalyze(body) {
 // ── Route: POST /optimize ──
 
 async function handleOptimize(body) {
-  const { resume, jd, context, model: modelInput, xlMode } = body;
+  const { resume, jd, context, model: modelInput, xlMode, domain, includeCertifications } = body;
 
   if (!resume || resume.trim().length < 100) {
     return response(400, { error: "Resume too short (need at least 100 characters)" });
@@ -285,7 +288,10 @@ async function handleOptimize(body) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
-  const systemPrompt = xlMode ? buildOptimizeSystemPromptXL() : buildOptimizeSystemPrompt();
+  const dom = domain || "software";
+  const systemPrompt = xlMode
+    ? buildOptimizeSystemPromptXL(dom, includeCertifications)
+    : buildOptimizeSystemPrompt(dom, includeCertifications);
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
   const model = resolveModel(modelInput);
 
@@ -356,8 +362,8 @@ async function handleOptimize(body) {
     });
   }
 
-  const scoring = scoreResume(resumeData);
-  const timeline_warnings = validateTimeline(resumeData);
+  const scoring = scoreResume(resumeData, dom);
+  const timeline_warnings = validateTimeline(resumeData, dom);
 
   return response(200, {
     resumeData,
@@ -445,19 +451,22 @@ if (typeof awslambda !== "undefined") {
     // Determine which mode (analyze or optimize)
     let systemPrompt, userMessage, model, mode;
 
+    let dom = "software";
     if (path.includes("/optimize") && method === "POST") {
-      const { resume, jd, context, model: modelInput } = body;
+      const { resume, jd, context, model: modelInput, domain, includeCertifications } = body;
       if (!resume || resume.trim().length < 100) return streamError(400, "Resume too short");
       if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
-      systemPrompt = buildOptimizeSystemPrompt();
+      dom = domain || "software";
+      systemPrompt = buildOptimizeSystemPrompt(dom, includeCertifications);
       userMessage = buildOptimizeUserMessage(resume, jd, context);
       model = resolveModel(modelInput);
       mode = "optimize";
     } else if (path.includes("/analyze") && method === "POST") {
-      const { jd, customer, context, model: modelInput, companies } = body;
+      const { jd, customer, context, model: modelInput, companies, domain, includeCertifications } = body;
       if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
-      systemPrompt = buildSystemPrompt();
-      userMessage = buildUserMessage(jd, customer, context, companies);
+      dom = domain || "software";
+      systemPrompt = buildSystemPrompt(dom, includeCertifications);
+      userMessage = buildUserMessage(jd, customer, context, companies, dom);
       model = resolveModel(modelInput);
       mode = "generate";
     } else {
@@ -553,8 +562,8 @@ if (typeof awslambda !== "undefined") {
     const resumeData = expandKeys(extractJSON(fullText));
 
     if (resumeData) {
-      const scoring = scoreResume(resumeData);
-      const timeline_warnings = validateTimeline(resumeData);
+      const scoring = scoreResume(resumeData, dom);
+      const timeline_warnings = validateTimeline(resumeData, dom);
 
       responseStream.write(`data: ${JSON.stringify({
         type: "complete",

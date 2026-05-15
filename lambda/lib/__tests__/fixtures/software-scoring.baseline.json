@@ -1,0 +1,252 @@
+[
+  {
+    "b": "Built a Kafka-based event pipeline that replaced the polling system three teams complained about",
+    "s": {
+      "average": 3,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Built a Kafka-based event pipeline that replaced the polling system three teams complained about",
+              "score": 3,
+              "grade": "Needs improvement",
+              "breakdown": [
+                "Strong action verb",
+                "technology name",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Reduced API latency 40% by adding a Redis read-through cache in front of the payments table",
+    "s": {
+      "average": 5,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Reduced API latency 40% by adding a Redis read-through cache in front of the payments table",
+              "score": 5,
+              "grade": "Good",
+              "breakdown": [
+                "Strong action verb",
+                "percentage improvement",
+                "technology name",
+                "concise bullet"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "b": "Spearheaded a transformative cloud migration leveraging Kubernetes, resulting in 60% cost reduction",
+    "s": {
+      "average": 1,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Spearheaded a transformative cloud migration leveraging Kubernetes, resulting in 60% cost reduction",
+              "score": 1,
+              "grade": "Rewrite required",
+              "breakdown": [
+                "percentage improvement",
+                "technology name",
+                "AI buzzword (hard ban)",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Owned the on-call rotation for the payments team — wrote the runbook new engineers still use",
+    "s": {
+      "average": 5,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Owned the on-call rotation for the payments team — wrote the runbook new engineers still use",
+              "score": 5,
+              "grade": "Good",
+              "breakdown": [
+                "Strong action verb",
+                "specific pain point (human voice)",
+                "team context (human voice)",
+                "concise bullet"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "b": "Configured Workday EIB inbound integrations and Core Connectors for Payroll across 12 countries",
+    "s": {
+      "average": 4,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Configured Workday EIB inbound integrations and Core Connectors for Payroll across 12 countries",
+              "score": 4,
+              "grade": "Needs improvement",
+              "breakdown": [
+                "Strong action verb",
+                "scale/reach metric",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Gathered requirements in fit-gap workshops and documented business process configuration in Workday",
+    "s": {
+      "average": 1,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Gathered requirements in fit-gap workshops and documented business process configuration in Workday",
+              "score": 1,
+              "grade": "Rewrite required",
+              "breakdown": [
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Developed Apex triggers and Lightning Web Components for Sales Cloud lead routing",
+    "s": {
+      "average": 4,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Developed Apex triggers and Lightning Web Components for Sales Cloud lead routing",
+              "score": 4,
+              "grade": "Needs improvement",
+              "breakdown": [
+                "Strong action verb",
+                "programming language",
+                "technology name",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Led UAT and parallel testing for the Workday HCM tenant before go-live",
+    "s": {
+      "average": 3,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Led UAT and parallel testing for the Workday HCM tenant before go-live",
+              "score": 3,
+              "grade": "Needs improvement",
+              "breakdown": [
+                "Strong action verb",
+                "programming language",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Assisted with various tasks and helped the team",
+    "s": {
+      "average": 1,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Assisted with various tasks and helped the team",
+              "score": 1,
+              "grade": "Rewrite required",
+              "breakdown": [
+                "Weak action verb (penalty)",
+                "team context (human voice)",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  },
+  {
+    "b": "Architected scalable, resilient, and performant microservices, enabling faster deployments",
+    "s": {
+      "average": 0,
+      "bulletCount": 1,
+      "results": [
+        {
+          "company": "X",
+          "bullets": [
+            {
+              "text": "Architected scalable, resilient, and performant microservices, enabling faster deployments",
+              "score": 0,
+              "grade": "Rewrite required",
+              "breakdown": [
+                "Strong action verb",
+                "trailing -ing clause",
+                "concise bullet"
+              ]
+            }
+          ],
+          "ordering_warning": "First 1 bullet(s) score below \"Good\" — consider reordering to put your strongest achievements first"
+        }
+      ]
+    }
+  }
+]

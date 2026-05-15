@@ -1,3 +1,4 @@
+// !!! DEAD CODE — NOT DEPLOYED. deploy.sh packages only lambda/. Edit lambda/index.js instead. !!!
 // ============================================================================
 // index.js — AWS Lambda handler for Resume Generator
 //

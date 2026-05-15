@@ -498,6 +498,36 @@ Never make every bullet sound triumphant. Real work is messy.`,
   },
 };
 
+// --- Curated verb fragments used verbatim in prompt text ---
+// (Distinct from ACTION_VERBS/WEAK_VERBS which drive scoring.)
+// Domain packs may override these so functional resumes use functional verbs.
+const PROMPT_VERBS = {
+  strong_long:
+    "Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created",
+  strong_short: "Built, Designed, Developed, Led, Reduced, Improved",
+  weak:
+    "Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood",
+  weak_short:
+    "Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed",
+};
+
+// --- Implicit-keyword inference rules block (injected into keyword placement) ---
+// Software-engineering defaults. Domain packs replace this wholesale.
+const IMPLICIT_KEYWORD_RULES = `IMPLICIT KEYWORD RULES:
+- If the JD says "distributed systems" → include at least 2 of: Kafka, gRPC, service mesh, event-driven, message queue
+- If the JD says "cloud infrastructure" → include at least 2 of: Terraform, Pulumi, CloudFormation, IaC
+- If the JD says "observability" → include at least 2 of: Prometheus, Grafana, Datadog, distributed tracing, OpenTelemetry
+- If the JD says "CI/CD" → include at least 1 of: Jenkins, GitHub Actions, ArgoCD, CircleCI
+- If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
+- If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership`;
+
+// --- Domain packs (sparse overlays; base config IS the "software" pack) ---
+// resolveDomain() in domains.js merges a pack onto the base config.
+// software:{} ⇒ identity passthrough (zero regression by construction).
+const DOMAIN_PACKS = {
+  software: {},
+};
+
 module.exports = {
   API,
   CONTACT,
@@ -517,4 +547,7 @@ module.exports = {
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
   ANTI_SLOP,
+  PROMPT_VERBS,
+  IMPLICIT_KEYWORD_RULES,
+  DOMAIN_PACKS,
 };
