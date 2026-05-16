@@ -1,3 +1,4 @@
+// !!! DEAD CODE — NOT DEPLOYED. deploy.sh packages only lambda/. Edit lambda/config.js instead. !!!
 // ============================================================================
 // config.js — All hardcoded rules for the resume generator
 // Based on: Top 10 school templates, Google XYZ formula, ATS rules,

@@ -2,17 +2,36 @@
 // prompts.js — System prompts and scoring logic for resume generation
 // ============================================================================
 
-const config = require("./config");
+const { resolveDomain } = require("./domains");
 
-function buildSystemPrompt() {
+// Certifications schema fragment + instruction, injected only when opted in.
+function certSchema(c, on) {
+  if (!on) return { schemaLine: "", instruction: "" };
+  const list = c.CERTIFICATIONS && c.CERTIFICATIONS.length
+    ? ` Prefer JD-relevant certifications from: ${c.CERTIFICATIONS.join(", ")}.`
+    : "";
+  return {
+    schemaLine: `,\n  "cert": ["Certification Name", "Another Certification"]`,
+    instruction: `\nCERTIFICATIONS: Populate "cert" with certifications the candidate would realistically hold for this role. Only include certifications that are credible for the candidate's background and named or implied by the JD.${list}\n`,
+  };
+}
+
+// Domain-specific context block (empty for the software pack ⇒ no change).
+function domainContextBlock(c) {
+  return c.DOMAIN_CONTEXT ? `\n${c.DOMAIN_CONTEXT}\n` : "";
+}
+
+function buildSystemPrompt(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
   return `You are a resume generator that creates ATS-optimized, human-readable resumes.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
 2. Use the exact JSON schema provided below
 3. Generate realistic work history with 3-4 companies over 6-7 years
-4. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created
-5. NEVER use weak/passive verbs: Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood
+4. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_long}
+5. NEVER use weak/passive verbs: ${c.PROMPT_VERBS.weak}
 6. Include specific technologies and quantifiable results where natural
 7. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
@@ -45,28 +64,28 @@ Use these SHORT KEYS in your JSON response (saves tokens):
         "Another XYZ bullet with specific results"
       ]
     }
-  ]
+  ]${cert.schemaLine}
 }
-
+${cert.instruction}${domainContextBlock(c)}
 WORK HISTORY GUIDELINES:
 - Current role: 18-28 months
 - Previous roles: 18-28 months each
-- Include 1-2 IT services companies (${config.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
+- Include 1-2 IT services companies (${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
 - Use competitor companies from the target industry
 - Each role should have 6-8 bullets
 - The resume can span up to 2 pages
 - Timeline must be realistic (no gaps, no overlaps)
 
 BULLET REQUIREMENTS:
-- Start with a strong, past-tense action verb (Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created)
-- NEVER start with weak/passive verbs: Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed
+- Start with a strong, past-tense action verb (${c.PROMPT_VERBS.strong_long})
+- NEVER start with weak/passive verbs: ${c.PROMPT_VERBS.weak_short}
 - Include specific technologies mentioned in JD
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 200 characters)
 - Focus on achievements, not responsibilities
 - Use digits instead of spelling out numbers (8 not "eight")
-${buildKeywordPlacementSection()}
-${buildAntiSlopPromptSection("standard")}
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("standard", domain)}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Hiring managers spend 6 seconds scanning a resume. The first 2 bullets of each role are the ONLY ones most will read.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE (how many users/systems/teams), IMPACT (business outcome), and LEADERSHIP
@@ -92,19 +111,21 @@ COMPANY & DOMAIN CONTEXT:
   in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
 CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
-function buildSystemPromptXL() {
+function buildSystemPromptXL(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
   return `You are a resume generator that creates keyword-heavy, ATS-optimized resumes using the Google XYZ formula. Your goal is to produce a dense, 3-page resume where EVERY bullet scores 5+ out of 7 on quality.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
 2. Use the exact JSON schema provided below
 3. Generate realistic work history with 3-4 companies over 6-7 years
-4. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
+4. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
 5. EVERY bullet MUST include: (a) strong action verb, (b) specific technology/framework name
 6. Most bullets should include a quantifiable metric, but not ALL — see WRITING STYLE below
 7. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. See TECHNOLOGY TIMELINE below.
@@ -138,28 +159,28 @@ Use these SHORT KEYS in your JSON response (saves tokens):
         "Another XYZ bullet with specific framework AND percentage"
       ]
     }
-  ]
+  ]${cert.schemaLine}
 }
-
+${cert.instruction}${domainContextBlock(c)}
 WORK HISTORY GUIDELINES:
 - Current role: 18-28 months
 - Previous roles: 18-28 months each
-- Include 1-2 IT services companies (${config.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
+- Include 1-2 IT services companies (${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
 - Use competitor companies from the target industry
 - Each role should have 10-15 detailed bullets
 - The resume should span approximately 3 pages
 - Timeline must be realistic (no gaps, no overlaps)
 
 BULLET REQUIREMENTS:
-- Start with a strong, past-tense action verb (Built, Designed, Developed, Led, Reduced, Improved)
+- Start with a strong, past-tense action verb (${c.PROMPT_VERBS.strong_short})
 - Include specific technologies mentioned in JD
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 250 characters for XL mode)
 - Focus on achievements, not responsibilities
 - Use digits instead of spelling out numbers
 - NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
-${buildKeywordPlacementSection()}
-${buildAntiSlopPromptSection("xl")}
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("xl", domain)}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 The first 3 bullets of each role are the ONLY ones most hiring managers will read.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
@@ -192,12 +213,13 @@ COMPANY & DOMAIN CONTEXT:
   in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
 CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
 }
 
-function buildUserMessage(jd, customer, context, companies) {
+function buildUserMessage(jd, customer, context, companies, domain) {
+  const c = resolveDomain(domain);
   let message = `Generate a resume for this job description:\n\n${jd}`;
 
   if (customer) {
@@ -213,7 +235,7 @@ function buildUserMessage(jd, customer, context, companies) {
     });
 
     if (companies.length < 3) {
-      message += `\n\nNote: Only ${companies.length} company${companies.length === 1 ? '' : 'ies'} provided. Fill remaining roles to reach 3-4 total companies over 6-7 years. Use one IT services firm (e.g., ${config.IT_SERVICES_FIRMS.slice(0, 3).join(", ")}) as the earliest role, and fill any other gaps with a relevant competitor company from the target industry.`;
+      message += `\n\nNote: Only ${companies.length} company${companies.length === 1 ? '' : 'ies'} provided. Fill remaining roles to reach 3-4 total companies over 6-7 years. Use one IT services firm (e.g., ${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")}) as the earliest role, and fill any other gaps with a relevant competitor company from the target industry.`;
     }
   } else {
     message += `\nUse competitor companies in work history where relevant.`;
@@ -227,7 +249,8 @@ function buildUserMessage(jd, customer, context, companies) {
   return message;
 }
 
-function scoreResume(resumeData) {
+function scoreResume(resumeData, domain) {
+  const c = resolveDomain(domain);
   if (!resumeData.experience) {
     return { average: 0, bulletCount: 0, results: [] };
   }
@@ -244,7 +267,7 @@ function scoreResume(resumeData) {
 
     const bullets = exp.bullets || [];
     for (const bullet of bullets) {
-      const score = scoreBullet(bullet);
+      const score = scoreBullet(bullet, c);
       companyResult.bullets.push({
         text: bullet,
         score: score.total,
@@ -257,7 +280,7 @@ function scoreResume(resumeData) {
     }
 
     // Role-level penalty: if every bullet in a role has a number, penalize all of them
-    const rolePenalties = config.QUALITY_SCORING.role_level_penalties;
+    const rolePenalties = c.QUALITY_SCORING.role_level_penalties;
     if (rolePenalties && companyResult.bullets.length >= 3) {
       const hasNumber = /\d/;
       const allHaveMetrics = companyResult.bullets.every(b => hasNumber.test(b.text));
@@ -272,7 +295,7 @@ function scoreResume(resumeData) {
 
     // Check if first 2 bullets are strong (skimmability warning)
     const firstTwo = companyResult.bullets.slice(0, 2);
-    const weakLeaders = firstTwo.filter(b => b.score < config.QUALITY_SCORING.thresholds.good);
+    const weakLeaders = firstTwo.filter(b => b.score < c.QUALITY_SCORING.thresholds.good);
     if (weakLeaders.length > 0) {
       companyResult.ordering_warning = `First ${weakLeaders.length} bullet(s) score below "Good" — consider reordering to put your strongest achievements first`;
     }
@@ -289,15 +312,16 @@ function scoreResume(resumeData) {
   };
 }
 
-function scoreBullet(bullet) {
+function scoreBullet(bullet, c) {
+  c = c || resolveDomain();
   let score = 0;
   let bizScore = 0;
   const breakdown = [];
 
   // Check for action verb at start
   const firstWord = bullet.split(/\s+/)[0].toLowerCase();
-  const isWeakVerb = config.WEAK_VERBS.some(v => firstWord === v.toLowerCase());
-  const startsWithActionVerb = Object.values(config.ACTION_VERBS)
+  const isWeakVerb = c.WEAK_VERBS.some(v => firstWord === v.toLowerCase());
+  const startsWithActionVerb = Object.values(c.ACTION_VERBS)
     .flat()
     .some(verb => bullet.toLowerCase().startsWith(verb.toLowerCase()));
 
@@ -305,12 +329,12 @@ function scoreBullet(bullet) {
     score -= 1;
     breakdown.push("Weak action verb (penalty)");
   } else if (startsWithActionVerb) {
-    score += config.QUALITY_SCORING.verb_check_points;
+    score += c.QUALITY_SCORING.verb_check_points;
     breakdown.push("Strong action verb");
   }
 
   // Check scoring rules — separate business group
-  for (const rule of config.QUALITY_SCORING.rules) {
+  for (const rule of c.QUALITY_SCORING.rules) {
     if (rule.pattern.test(bullet)) {
       if (rule.group === "business") {
         bizScore += rule.points;
@@ -322,20 +346,20 @@ function scoreBullet(bullet) {
   }
 
   // Apply business group cap to prevent inflation
-  const cap = config.QUALITY_SCORING.business_group_cap || 3;
+  const cap = c.QUALITY_SCORING.business_group_cap || 3;
   const cappedBiz = Math.min(bizScore, cap);
   score += cappedBiz;
 
   // Note: no penalty for missing metrics — not every bullet needs numbers
 
   if (bullet.length > 220) {
-    score += config.QUALITY_SCORING.over_200_chars_penalty;
+    score += c.QUALITY_SCORING.over_200_chars_penalty;
     breakdown.push("Too long (penalty)");
   }
 
   // Anti-slop penalties
-  if (config.QUALITY_SCORING.slop_penalties) {
-    for (const rule of config.QUALITY_SCORING.slop_penalties) {
+  if (c.QUALITY_SCORING.slop_penalties) {
+    for (const rule of c.QUALITY_SCORING.slop_penalties) {
       if (rule.pattern.test(bullet)) {
         score += rule.points;
         breakdown.push(rule.label);
@@ -344,8 +368,8 @@ function scoreBullet(bullet) {
   }
 
   // Authenticity bonuses
-  if (config.QUALITY_SCORING.authenticity_bonuses) {
-    for (const rule of config.QUALITY_SCORING.authenticity_bonuses) {
+  if (c.QUALITY_SCORING.authenticity_bonuses) {
+    for (const rule of c.QUALITY_SCORING.authenticity_bonuses) {
       if (rule.pattern.test(bullet)) {
         score += rule.points;
         breakdown.push(rule.label);
@@ -355,11 +379,11 @@ function scoreBullet(bullet) {
 
   // Determine grade
   let grade;
-  if (score >= config.QUALITY_SCORING.thresholds.excellent) {
+  if (score >= c.QUALITY_SCORING.thresholds.excellent) {
     grade = "Excellent";
-  } else if (score >= config.QUALITY_SCORING.thresholds.good) {
+  } else if (score >= c.QUALITY_SCORING.thresholds.good) {
     grade = "Good";
-  } else if (score >= config.QUALITY_SCORING.thresholds.needs_improvement) {
+  } else if (score >= c.QUALITY_SCORING.thresholds.needs_improvement) {
     grade = "Needs improvement";
   } else {
     grade = "Rewrite required";
@@ -372,7 +396,8 @@ function scoreBullet(bullet) {
   };
 }
 
-function validateTimeline(resumeData) {
+function validateTimeline(resumeData, domain) {
+  const c = resolveDomain(domain);
   const warnings = [];
   
   if (!resumeData.experience || resumeData.experience.length === 0) {
@@ -408,7 +433,7 @@ function validateTimeline(resumeData) {
 
     for (const bullet of exp.bullets || []) {
       const lowerBullet = bullet.toLowerCase();
-      for (const [tech, timeline] of Object.entries(config.TECH_TIMELINE)) {
+      for (const [tech, timeline] of Object.entries(c.TECH_TIMELINE)) {
         const escaped = tech.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`\\b${escaped}\\b`);
         if (regex.test(lowerBullet) && expYear < timeline.earliest) {
@@ -434,7 +459,9 @@ function parseDate(dateStr) {
 
 // ── Optimize mode prompts ──
 
-function buildOptimizeSystemPrompt() {
+function buildOptimizeSystemPrompt(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
   return `You are a resume optimizer that rewrites existing resumes to be ATS-optimized for a specific job description using the Google XYZ formula.
 
 CRITICAL RULES:
@@ -449,7 +476,7 @@ CRITICAL RULES:
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role
 11. REORDER technical skills to prioritize what the JD asks for
-12. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
+12. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
 13. NEVER mention a technology in a role dated BEFORE that technology existed (see TECHNOLOGY TIMELINE below). This is a HARD CONSTRAINT.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
@@ -497,9 +524,9 @@ Use these SHORT KEYS in your JSON response (saves tokens):
         "Another rewritten bullet with specific quantified results"
       ]
     }
-  ]
+  ]${cert.schemaLine}
 }
-
+${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 6-8 bullets
@@ -509,9 +536,9 @@ OPTIMIZATION RULES:
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
-- NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood). Use direct verbs (Built, Designed, Developed, Led, Reduced, Improved)
-${buildKeywordPlacementSection()}
-${buildAntiSlopPromptSection("optimize")}
+- NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak}). Use direct verbs (${c.PROMPT_VERBS.strong_short})
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("optimize", domain)}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 When rewriting bullets, place the strongest rewritten bullets FIRST in each role.
 - Bullet 1 MUST answer "what is the biggest thing this person did here?" — show SCOPE, IMPACT, and LEADERSHIP
@@ -525,12 +552,14 @@ BUSINESS VALUE MIX (per role):
 - 1-2 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
 CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
-function buildOptimizeSystemPromptXL() {
+function buildOptimizeSystemPromptXL(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
   return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized for a specific job description using the Google XYZ formula. Your goal is a dense 3-page resume where EVERY bullet scores 5+ out of 7 on quality.
 
 CRITICAL RULES:
@@ -545,7 +574,7 @@ CRITICAL RULES:
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role — make it 5-8 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
-12. Use strong, direct action verbs: Built, Designed, Developed, Led, Reduced, Improved. NEVER use weak/passive verbs (Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood)
+12. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
 13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT. See TECHNOLOGY TIMELINE below.
 
 Use these SHORT KEYS in your JSON response (saves tokens):
@@ -593,9 +622,9 @@ Use these SHORT KEYS in your JSON response (saves tokens):
         "Another rewritten bullet with specific framework AND percentage"
       ]
     }
-  ]
+  ]${cert.schemaLine}
 }
-
+${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 10-15 detailed bullets
@@ -606,8 +635,8 @@ OPTIMIZATION RULES:
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
 - PROFESSIONAL SUMMARY must be 5-8 sentences packed with keywords from the JD
-${buildKeywordPlacementSection()}
-${buildAntiSlopPromptSection("optimize-xl")}
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("optimize-xl", domain)}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
 Place the strongest rewritten bullets FIRST in each role.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
@@ -623,7 +652,7 @@ With 10-15 bullets, mix these types:
 - 2-3 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(config.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
 
 CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
@@ -641,7 +670,8 @@ function buildOptimizeUserMessage(resume, jd, context) {
   return message;
 }
 
-function buildKeywordPlacementSection() {
+function buildKeywordPlacementSection(domain) {
+  const c = resolveDomain(domain);
   return `
 KEYWORD PLACEMENT — 100% MATCH IS NON-NEGOTIABLE:
 The resume MUST contain every single technology, tool, framework, methodology, and requirement mentioned in the JD. A recruiter scanning this resume should think "this candidate is a perfect fit" within 6 seconds.
@@ -662,13 +692,7 @@ Recruiters read resumes in an F-pattern. These are the hot zones, in priority or
 STEP 3 — VERIFY BEFORE RETURNING:
 After generating the full resume JSON, mentally scan it against the JD keyword list. If ANY explicit JD keyword is missing from the resume, add it to an appropriate bullet or the skills section. Zero misses.
 
-IMPLICIT KEYWORD RULES:
-- If the JD says "distributed systems" → include at least 2 of: Kafka, gRPC, service mesh, event-driven, message queue
-- If the JD says "cloud infrastructure" → include at least 2 of: Terraform, Pulumi, CloudFormation, IaC
-- If the JD says "observability" → include at least 2 of: Prometheus, Grafana, Datadog, distributed tracing, OpenTelemetry
-- If the JD says "CI/CD" → include at least 1 of: Jenkins, GitHub Actions, ArgoCD, CircleCI
-- If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
-- If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership
+${c.IMPLICIT_KEYWORD_RULES}
 
 ZERO MISSES ON EXPLICIT KEYWORDS:
 Every technology, tool, or framework that is explicitly named in the JD MUST appear somewhere in the resume — no exceptions, even for "nice to have" items. If the JD says "Pulumi", the word "Pulumi" must appear. If the JD says "Datadog", the word "Datadog" must appear. Do not paraphrase or substitute — use the exact term. Niche and rare technologies are especially important because they are the strongest signal to a recruiter that this candidate is a match. A recruiter who sees a rare keyword like "Pulumi" or "service mesh" in both the JD and the resume will immediately flag the candidate as a fit. Missing even one explicit keyword can cause an ATS rejection.
@@ -683,8 +707,8 @@ Keywords must appear in CONTEXT, not as a list dump. Bad: "Used Kafka, gRPC, Kub
 `;
 }
 
-function buildAntiSlopPromptSection(mode) {
-  const slop = config.ANTI_SLOP;
+function buildAntiSlopPromptSection(mode, domain) {
+  const slop = resolveDomain(domain).ANTI_SLOP;
 
   const hardWords = slop.banned_words.filter(w => w.severity === "hard").map(w => w.word);
   const softWords = slop.banned_words.filter(w => w.severity === "soft").map(w => w.word);

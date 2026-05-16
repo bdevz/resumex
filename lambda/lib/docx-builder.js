@@ -130,6 +130,17 @@ function createParagraph(text, tmpl, colorOverride) {
   });
 }
 
+// Certifications: rendered only when the LLM emitted a non-empty list
+// (the "Add certifications" flag is on). Absent ⇒ section omitted entirely.
+function createCertificationsBlock(certs, tmpl, colorOverride) {
+  if (!Array.isArray(certs) || certs.length === 0) return [];
+  return [
+    createSpacing(),
+    createSectionHeader(config.ATS_HEADERS.certifications, tmpl, colorOverride),
+    createParagraph(certs.join("  •  "), tmpl, colorOverride),
+  ];
+}
+
 function createSpacing() {
   return new Paragraph({
     children: [new TextRun({ text: "" })],
@@ -413,6 +424,8 @@ function buildSingleColumnDoc(resumeData, contact, education, tmpl) {
     );
   }
 
+  children.push(...createCertificationsBlock(resumeData.certifications, tmpl));
+
   return new Document({
     sections: [{
       properties: {
@@ -466,6 +479,9 @@ function buildSectionContent(sections, resumeData, contact, education, tmpl, col
           children.push(...createEducationSection(education, tmpl, colorOverride));
           children.push(createSpacing());
         }
+        break;
+      case "certifications":
+        children.push(...createCertificationsBlock(resumeData.certifications, tmpl, colorOverride));
         break;
     }
   }

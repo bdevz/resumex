@@ -498,6 +498,235 @@ Never make every bullet sound triumphant. Real work is messy.`,
   },
 };
 
+// --- Curated verb fragments used verbatim in prompt text ---
+// (Distinct from ACTION_VERBS/WEAK_VERBS which drive scoring.)
+// Domain packs may override these so functional resumes use functional verbs.
+const PROMPT_VERBS = {
+  strong_long:
+    "Built, Designed, Developed, Led, Reduced, Improved, Architected, Deployed, Automated, Migrated, Optimized, Created",
+  strong_short: "Built, Designed, Developed, Led, Reduced, Improved",
+  weak:
+    "Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed, Stood",
+  weak_short:
+    "Assisted, Helped, Participated, Supported, Maintained, Wrote, Served, Completed, Handled, Utilized, Worked, Collaborated, Contributed",
+};
+
+// --- Implicit-keyword inference rules block (injected into keyword placement) ---
+// Software-engineering defaults. Domain packs replace this wholesale.
+const IMPLICIT_KEYWORD_RULES = `IMPLICIT KEYWORD RULES:
+- If the JD says "distributed systems" → include at least 2 of: Kafka, gRPC, service mesh, event-driven, message queue
+- If the JD says "cloud infrastructure" → include at least 2 of: Terraform, Pulumi, CloudFormation, IaC
+- If the JD says "observability" → include at least 2 of: Prometheus, Grafana, Datadog, distributed tracing, OpenTelemetry
+- If the JD says "CI/CD" → include at least 1 of: Jenkins, GitHub Actions, ArgoCD, CircleCI
+- If the JD says "microservices" → include at least 2 of: Docker, Kubernetes, service discovery, API gateway, container orchestration
+- If the JD mentions a seniority level (Staff, Principal, Lead) → the summary and first bullets must reflect that scope: org-wide impact, cross-team leadership, technical roadmap ownership`;
+
+// --- Domain packs (sparse overlays; base config IS the "software" pack) ---
+// resolveDomain() in domains.js merges a pack onto the base config.
+// software:{} ⇒ identity passthrough (zero regression by construction).
+const DOMAIN_PACKS = {
+  software: {},
+
+  // ───────────────────────── Salesforce ─────────────────────────
+  salesforce: {
+    prompt_verbs: {
+      strong_long:
+        "Configured, Built, Designed, Implemented, Customized, Automated, Led, Delivered, Migrated, Integrated, Documented, Architected",
+      strong_short: "Configured, Built, Designed, Implemented, Delivered, Led",
+    },
+    action_verbs_add: {
+      technical: ["Configured", "Customized", "Implemented", "Automated", "Integrated"],
+      problem_solving: ["Analyzed", "Mapped", "Validated", "Tested"],
+      communication: ["Gathered", "Documented", "Facilitated", "Translated"],
+    },
+    scoring_rules_replace: {
+      "programming language": {
+        pattern: /\b(?:Apex|SOQL|SOSL|JavaScript|LWC|Lightning Web Components?|Aura|Visualforce|Java|Bash)\b/i,
+      },
+      "technology name": {
+        pattern: /\b(?:Salesforce|Sales Cloud|Service Cloud|Experience Cloud|Marketing Cloud|Data Cloud|Field Service|Revenue Cloud|CPQ|Agentforce|Slack|Flow Builder|Flow|Process Builder|Workflow Rules?|Validation Rules?|Apex Triggers?|Batch Apex|Platform Events?|Lightning|Aura|Visualforce|SFDX|Salesforce CLI|Data Loader|Workbench|Copado|Gearset|Flosum|OmniStudio|AppExchange|Permission Sets?|Sharing Rules?|Approval Process|Record Types?|Einstein|MuleSoft|Pardot|Marketing Cloud Account Engagement)\b/i,
+      },
+    },
+    tech_timeline: {
+      "salesforce lightning": { earliest: 2015 },
+      "lightning experience": { earliest: 2015 },
+      "lightning web components": { earliest: 2019 },
+      "lwc": { earliest: 2019 },
+      "flow builder": { earliest: 2019 },
+      "process builder": { earliest: 2015 },
+      "salesforce cpq": { earliest: 2016 },
+      "salesforce dx": { earliest: 2017 },
+      "sfdx": { earliest: 2017 },
+      "data cloud": { earliest: 2022 },
+      "agentforce": { earliest: 2024 },
+      "einstein": { earliest: 2016 },
+      "omnistudio": { earliest: 2021 },
+    },
+    skill_categories: [
+      "Salesforce Clouds",
+      "Development (Apex/LWC)",
+      "Automation & Configuration",
+      "Integration & Data",
+      "DevOps & Tools",
+      "Methodology & Certifications",
+    ],
+    implicit_keyword_rules: `IMPLICIT KEYWORD RULES (Salesforce ecosystem):
+- If the JD says "automation" or "no-code" → include at least 2 of: Flow Builder, Process Builder, validation rules, approval processes, assignment rules
+- If the JD says "custom development" or "code" → include at least 2 of: Apex, SOQL, LWC, triggers, batch Apex, Apex REST
+- If the JD says "integration" → include at least 2 of: REST/SOAP APIs, MuleSoft, Platform Events, middleware, Bulk API
+- If the JD says "data migration" → include at least 2 of: Data Loader, Workbench, ETL, data mapping, deduplication
+- If the JD says "deployment" or "release" → include at least 2 of: SFDX, change sets, Copado/Gearset, sandboxes, CI/CD
+- If the JD says "Sales/Service/Experience Cloud" → reference the matching cloud features (opportunity management, case management, communities/portals) explicitly
+- If the JD mentions Admin → emphasize profiles, permission sets, role hierarchy, OWD, reports & dashboards
+- If the JD mentions Architect → emphasize data modeling, sharing & visibility, governance, integration patterns, large data volumes`,
+    domain_context: `SALESFORCE DOMAIN — write for the Salesforce ecosystem. This candidate is a Salesforce professional (Administrator / Functional Consultant / Developer / Architect), NOT a generic software engineer. Hard rules:
+- Use exact Salesforce terminology, never paraphrased: write "Flow Builder" (not "workflow tool"), "Lightning Web Components" / "LWC", "validation rules", "permission sets", "sharing rules", "Apex", "SOQL". The literal term is what the ATS matches.
+- Frame work as declarative-first configuration plus targeted Apex, org/release management, sandbox-to-prod deployments, UAT, and business requirements gathering — NOT microservices, distributed systems, or Kubernetes.
+- Realistic career model: a mix of Salesforce consultancies/SIs and in-house Salesforce teams; certifications are a top recruiter signal; many professionals come from business/operations backgrounds, not CS.
+- Bullets should name the cloud (Sales/Service/Experience Cloud), the objects/automation touched, and the business process improved (lead-to-cash, case deflection, onboarding).`,
+    it_services_firms: [
+      "Accenture", "Deloitte Digital", "Slalom", "Capgemini",
+      "Cognizant", "IBM iX", "Silverline", "Coastal Cloud",
+    ],
+    certifications: [
+      "Salesforce Certified Administrator",
+      "Salesforce Certified Advanced Administrator",
+      "Salesforce Certified Platform App Builder",
+      "Salesforce Certified Platform Developer I",
+      "Salesforce Certified Platform Developer II",
+      "Salesforce Certified JavaScript Developer I",
+      "Salesforce Certified Sales Cloud Consultant",
+      "Salesforce Certified Service Cloud Consultant",
+      "Salesforce Certified Experience Cloud Consultant",
+      "Salesforce Certified CPQ Specialist",
+      "Salesforce Certified Application Architect",
+      "Salesforce Certified System Architect",
+    ],
+    education: {
+      masters: {
+        degree: "Master of Business Administration",
+        school: "Arizona State University",
+        location: "Tempe, AZ",
+        graduated: "May 2016",
+      },
+      bachelors: {
+        degree: "Bachelor of Business Administration in Information Systems",
+        school: "University of Arizona",
+        location: "Tucson, AZ",
+        graduated: "May 2013",
+      },
+    },
+    anti_slop: {
+      tone: `Write like a Salesforce consultant updating their resume between client calls — practical and specific. Name the clouds, objects, and automations you actually touched, and the business process you fixed. Mention the messy data, the legacy org, the permission model nobody understood, the go-live that ran long. Don't write like a Salesforce marketing deck. Real implementations have scope cuts, data issues, and hypercare.`,
+      banned_phrases_add: [
+        { phrase: "360-degree view of the customer", severity: "hard" },
+        { phrase: "single source of truth", severity: "soft" },
+        { phrase: "digital transformation journey", severity: "hard" },
+        { phrase: "empower business users", severity: "soft" },
+      ],
+      authenticity_bonuses_add: [
+        { pattern: /\b(?:go-live|hypercare|cutover|fit-gap|user stor(?:y|ies)|sandbox|UAT|data migration|change set|managed package|org|admin handoff|backlog)\b/i, points: 1, label: "Salesforce delivery context (authentic voice)" },
+      ],
+    },
+  },
+
+  // ───────────────────────── Workday ─────────────────────────
+  workday: {
+    prompt_verbs: {
+      strong_long:
+        "Configured, Designed, Implemented, Built, Led, Delivered, Migrated, Integrated, Documented, Tested, Analyzed, Mapped",
+      strong_short: "Configured, Designed, Implemented, Led, Delivered, Migrated",
+    },
+    action_verbs_add: {
+      technical: ["Configured", "Implemented", "Integrated", "Migrated"],
+      problem_solving: ["Analyzed", "Mapped", "Validated", "Tested"],
+      communication: ["Gathered", "Documented", "Facilitated", "Translated"],
+    },
+    scoring_rules_replace: {
+      "programming language": {
+        pattern: /\b(?:XSLT|XML|XPath|SQL|Java|Workday Studio|EIB|Core Connectors?|PECI|PICOF|Web Services?|SOAP|REST)\b/i,
+      },
+      "technology name": {
+        pattern: /\b(?:Workday|EIB|Core Connectors?|Workday Studio|Studio|BIRT|Calculated Fields?|Business Process(?: Framework)?|Condition Rules?|Security Groups?|Report Writer|Advanced Reports?|Matrix Reports?|Composite Reports?|Dashboards?|Discovery Boards?|PECI|PICOF|Cloud Connect|Document Transformation|Workday Extend|Prism Analytics|Adaptive Planning|HCM|Financials?|Payroll|Compensation|Benefits|Absence|Time Tracking|Recruiting|Talent|Tenant|Workday Pro|Workday Community)\b/i,
+      },
+    },
+    tech_timeline: {
+      "workday": { earliest: 2006 },
+      "workday hcm": { earliest: 2006 },
+      "workday financials": { earliest: 2007 },
+      "workday payroll": { earliest: 2008 },
+      "workday studio": { earliest: 2010 },
+      "core connectors": { earliest: 2011 },
+      "eib": { earliest: 2009 },
+      "birt": { earliest: 2010 },
+      "prism analytics": { earliest: 2017 },
+      "workday extend": { earliest: 2020 },
+      "adaptive planning": { earliest: 2018 },
+      "peci": { earliest: 2014 },
+      "picof": { earliest: 2013 },
+    },
+    skill_categories: [
+      "Workday Modules",
+      "Integrations",
+      "Reporting & Analytics",
+      "Configuration & Security",
+      "Methodology & Tools",
+      "Certifications",
+    ],
+    implicit_keyword_rules: `IMPLICIT KEYWORD RULES (Workday ecosystem):
+- If the JD says "integrations" → include at least 2 of: EIB, Core Connectors, Workday Studio, Document Transformation, web services (SOAP/REST), XSLT
+- If the JD says "reporting" → include at least 2 of: Report Writer, Advanced/Matrix/Composite reports, Calculated Fields, BIRT, dashboards
+- If the JD says "security" → include at least 2 of: security groups, domain security policies, business process security policies, segregation of duties
+- If the JD says "business process" → include at least 2 of: Business Process Framework, condition rules, approval steps, notifications
+- If the JD says "data conversion" → include at least 2 of: iLoads, EIB, data mapping, validation, mock conversions
+- If the JD mentions a module (HCM, Payroll, Financials, Benefits, Time Tracking, Recruiting) → reference that module's real configuration objects explicitly
+- If the JD mentions "deployment" or "implementation" → reference Workday Launch/deployment methodology, tenant strategy (Sandbox/Implementation/Prod), and semi-annual release (R1/R2) adoption`,
+    domain_context: `WORKDAY DOMAIN — write for the Workday ecosystem. This candidate is a Workday professional (HCM / Integrations / Financials / Reporting / Security Consultant or SME), NOT a generic software engineer. Hard rules:
+- Use exact Workday terminology, never paraphrased: "EIB" (not "data import tool"), "Core Connectors", "Workday Studio", "BIRT", "Calculated Fields", "Business Process Framework", "security groups", "tenant". The literal term is what the ATS matches.
+- Frame work as tenant configuration, integration build/maintenance, report development, business process design, requirements workshops, fit-gap analysis, data conversion, UAT/parallel testing, go-live and post-production support — NOT microservices or distributed systems.
+- Realistic career model: longer tenure (often 8–15 years), employers skew to Workday partners/SIs (Deloitte, Accenture, Cognizant, Kainos, Alight, PwC, IBM) and large enterprises; backgrounds are frequently HR, Finance, or Business rather than Computer Science. Workday certification is partner-gated, so most individuals do NOT list it unless the certifications flag is on.
+- Bullets should name the module, the integration/report/business process built, and the HR/Finance outcome (faster onboarding, accurate payroll, clean reporting).`,
+    it_services_firms: [
+      "Deloitte", "Accenture", "Cognizant", "Kainos",
+      "PwC", "IBM", "Alight Solutions", "Collaborative Solutions",
+    ],
+    certifications: [
+      "Workday Pro - HCM",
+      "Workday Pro - Integrations",
+      "Workday Pro - Financials",
+      "Workday Pro - Reporting",
+      "Workday Pro - Security",
+      "Workday Pro - Payroll",
+    ],
+    education: {
+      masters: {
+        degree: "Master of Science in Human Resource Management",
+        school: "Pennsylvania State University",
+        location: "University Park, PA",
+        graduated: "May 2014",
+      },
+      bachelors: {
+        degree: "Bachelor of Business Administration in Finance",
+        school: "Indiana University",
+        location: "Bloomington, IN",
+        graduated: "May 2011",
+      },
+    },
+    anti_slop: {
+      tone: `Write like a Workday consultant updating their resume between client engagements — practical and specific. Name the modules, the integrations, the reports, and the client's real pain (the legacy HRIS, the messy org structure, the security model nobody had documented, the payroll parallel that didn't tie out). Don't write like a Workday sales deck. Real implementations have scope cuts, conversion issues, and go-live firefights.`,
+      banned_phrases_add: [
+        { phrase: "power of one", severity: "hard" },
+        { phrase: "one source of truth", severity: "soft" },
+        { phrase: "people-first", severity: "soft" },
+        { phrase: "digital HR transformation", severity: "hard" },
+      ],
+      authenticity_bonuses_add: [
+        { pattern: /\b(?:go-live|hypercare|cutover|fit-gap|parallel testing|mock conversion|requirements workshop|tenant|sandbox|UAT|production support|R[12] release|configuration workbook)\b/i, points: 1, label: "Workday delivery context (authentic voice)" },
+      ],
+    },
+  },
+};
+
 module.exports = {
   API,
   CONTACT,
@@ -517,4 +746,7 @@ module.exports = {
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
   ANTI_SLOP,
+  PROMPT_VERBS,
+  IMPLICIT_KEYWORD_RULES,
+  DOMAIN_PACKS,
 };
