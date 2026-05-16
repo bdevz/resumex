@@ -131,21 +131,119 @@ function checkAuth(headers) {
   return passphrase && passphrase === process.env.SHARED_PASSPHRASE;
 }
 
-// Anthropic model aliases → direct Anthropic model IDs
-const ANTHROPIC_MODELS = {
-  "claude-opus-4.6": "claude-opus-4-6",
-  "claude-opus-4.5": "claude-opus-4-5-20251101",
-  "claude-sonnet-4.6": "claude-sonnet-4-6",
-  "claude-sonnet-4.5": "claude-sonnet-4-5-20250929",
-  "claude-haiku-4.5": "claude-haiku-4-5-20251001",
+// Model registry: dropdown alias → { id, provider, label }
+const DEFAULT_MODEL_ALIAS = "claude-opus-4.6";
+const MODELS = {
+  // ── Anthropic ──
+  "claude-opus-4.7":   { id: "claude-opus-4-7",            provider: "anthropic", label: "Claude Opus 4.7" },
+  "claude-opus-4.6":   { id: "claude-opus-4-6",            provider: "anthropic", label: "Claude Opus 4.6" },
+  "claude-opus-4.5":   { id: "claude-opus-4-5-20251101",   provider: "anthropic", label: "Claude Opus 4.5" },
+  "claude-sonnet-4.6": { id: "claude-sonnet-4-6",          provider: "anthropic", label: "Claude Sonnet 4.6" },
+  "claude-sonnet-4.5": { id: "claude-sonnet-4-5-20250929", provider: "anthropic", label: "Claude Sonnet 4.5" },
+  "claude-haiku-4.5":  { id: "claude-haiku-4-5-20251001",  provider: "anthropic", label: "Claude Haiku 4.5" },
+  // ── OpenAI ──
+  "gpt-5":      { id: "gpt-5",      provider: "openai", label: "GPT-5" },
+  "gpt-5-mini": { id: "gpt-5-mini", provider: "openai", label: "GPT-5 mini" },
+  "gpt-4.1":    { id: "gpt-4.1",    provider: "openai", label: "GPT-4.1" },
+  "gpt-4o":     { id: "gpt-4o",     provider: "openai", label: "GPT-4o" },
 };
 
-function resolveModel(modelInput) {
-  if (!modelInput) return config.API.default_model;
-  if (ANTHROPIC_MODELS[modelInput]) return ANTHROPIC_MODELS[modelInput];
-  if (modelInput.startsWith("claude-")) return modelInput;
-  console.warn(`Model "${modelInput}" not recognized, using default: ${config.API.default_model}`);
-  return config.API.default_model;
+function modelInfo(modelInput) {
+  if (modelInput && MODELS[modelInput]) return { alias: modelInput, ...MODELS[modelInput] };
+  // Unknown but provider-shaped → pass through to that provider
+  if (modelInput && modelInput.startsWith("claude-")) return { alias: modelInput, id: modelInput, provider: "anthropic", label: modelInput };
+  if (modelInput && (modelInput.startsWith("gpt-") || /^o\d/.test(modelInput))) return { alias: modelInput, id: modelInput, provider: "openai", label: modelInput };
+  console.warn(`Model "${modelInput}" not recognized, using default: ${DEFAULT_MODEL_ALIAS}`);
+  return { alias: DEFAULT_MODEL_ALIAS, ...MODELS[DEFAULT_MODEL_ALIAS] };
+}
+
+// Unified LLM call. Returns { ok:true, text, modelUsed, usage }
+// or { ok:false, status, error, details, isTimeout }.
+async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
+  const m = modelInfo(modelInput);
+  let apiResponse;
+  try {
+    if (m.provider === "openai") {
+      apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        signal: AbortSignal.timeout(240_000),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: m.id,
+          max_completion_tokens: maxTokens,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+        }),
+      });
+    } else {
+      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: AbortSignal.timeout(240_000),
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: m.id,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+      });
+    }
+  } catch (fetchErr) {
+    const isTimeout = fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError";
+    console.error(`${m.provider} fetch failed:`, fetchErr.message);
+    return {
+      ok: false,
+      status: 504,
+      isTimeout,
+      error: isTimeout
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-4o) or disable XL mode."
+        : `Network error calling LLM API: ${fetchErr.message}`,
+    };
+  }
+
+  if (!apiResponse.ok) {
+    const errText = await apiResponse.text();
+    console.error(`${m.provider} error (${apiResponse.status}):`, errText);
+    let friendly = "LLM API error";
+    try {
+      const j = JSON.parse(errText);
+      friendly = j.error?.message || j.error?.type || friendly;
+    } catch {}
+    return { ok: false, status: apiResponse.status, error: friendly, details: errText };
+  }
+
+  const data = await apiResponse.json();
+
+  if (m.provider === "openai") {
+    if (data.error) {
+      console.error("OpenAI API error:", JSON.stringify(data.error));
+      return { ok: false, status: 422, error: data.error?.message || "Model returned an error." };
+    }
+    const choice = data.choices?.[0];
+    const text = choice?.message?.content || "";
+    if (!text) return { ok: false, status: 422, error: "Model returned empty response. Try again." };
+    return { ok: true, text, modelUsed: data.model || m.id, usage: data.usage || null,
+             truncated: choice?.finish_reason === "length" };
+  }
+
+  if (data.type === "error") {
+    console.error("Anthropic API error:", JSON.stringify(data.error));
+    return { ok: false, status: 422, error: data.error?.message || "Model returned an error." };
+  }
+  const text = data.content?.[0]?.text || "";
+  if (!text) return { ok: false, status: 422, error: "Model returned empty response. Try again." };
+  return { ok: true, text, modelUsed: data.model || m.id, usage: data.usage || null,
+           truncated: data.stop_reason === "max_tokens" };
 }
 
 function getPath(event) {
@@ -195,72 +293,20 @@ async function handleAnalyze(body) {
     ? buildSystemPromptXL(dom, includeCertifications)
     : buildSystemPrompt(dom, includeCertifications);
   const userMessage = buildUserMessage(jd, customer, context, companies, dom);
-  const model = resolveModel(modelInput);
 
-  // Call Anthropic Messages API (4 min timeout — leaves buffer before Lambda's 5 min limit)
-  let apiResponse;
-  try {
-    apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: AbortSignal.timeout(240_000),
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: xlMode ? 16384 : 8192,
-        system: systemPrompt,
-        messages: [
-          { role: "user", content: userMessage },
-        ],
-      }),
-    });
-  } catch (fetchErr) {
-    const isTimeout = fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError";
-    console.error("Anthropic fetch failed:", fetchErr.message);
-    return response(504, {
-      error: isTimeout
-        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku) or disable XL mode."
-        : `Network error calling LLM API: ${fetchErr.message}`,
-    });
-  }
-
-  if (!apiResponse.ok) {
-    const errText = await apiResponse.text();
-    console.error(`Anthropic error (${apiResponse.status}):`, errText);
-    return response(apiResponse.status, {
-      error: "LLM API error",
-      status: apiResponse.status,
-      details: errText,
-    });
-  }
-
-  const data = await apiResponse.json();
-
-  if (data.type === "error") {
-    console.error("Anthropic API error:", JSON.stringify(data.error));
-    return response(422, {
-      error: data.error?.message || "Model returned an error.",
-    });
-  }
-
-  const responseText = data.content?.[0]?.text || "";
-  const stopReason = data.stop_reason;
-  if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again." });
+  const r = await callLLM(modelInput, systemPrompt, userMessage, xlMode ? 16384 : 8192);
+  if (!r.ok) {
+    return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
 
   // Parse JSON and expand short keys to full keys
-  const resumeData = expandKeys(extractJSON(responseText));
+  const resumeData = expandKeys(extractJSON(r.text));
   if (!resumeData) {
-    const truncated = stopReason === "max_tokens";
     return response(422, {
-      error: truncated
+      error: r.truncated
         ? "Model response was cut off (too long)."
         : "Model returned invalid JSON. Try again.",
-      raw_preview: responseText.substring(0, 500),
+      raw_preview: r.text.substring(0, 500),
     });
   }
 
@@ -271,8 +317,8 @@ async function handleAnalyze(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: data.model || model,
-    usage: data.usage || null,
+    model_used: r.modelUsed,
+    usage: r.usage,
   });
 }
 
@@ -294,72 +340,20 @@ async function handleOptimize(body) {
     ? buildOptimizeSystemPromptXL(dom, includeCertifications)
     : buildOptimizeSystemPrompt(dom, includeCertifications);
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
-  const model = resolveModel(modelInput);
 
-  // Call Anthropic Messages API (4 min timeout — leaves buffer before Lambda's 5 min limit)
-  let apiResponse;
-  try {
-    apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: AbortSignal.timeout(240_000),
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: xlMode ? 16384 : 8192,
-        system: systemPrompt,
-        messages: [
-          { role: "user", content: userMessage },
-        ],
-      }),
-    });
-  } catch (fetchErr) {
-    const isTimeout = fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError";
-    console.error("Anthropic fetch failed:", fetchErr.message);
-    return response(504, {
-      error: isTimeout
-        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku) or disable XL mode."
-        : `Network error calling LLM API: ${fetchErr.message}`,
-    });
-  }
-
-  if (!apiResponse.ok) {
-    const errText = await apiResponse.text();
-    console.error(`Anthropic error (${apiResponse.status}):`, errText);
-    return response(apiResponse.status, {
-      error: "LLM API error",
-      status: apiResponse.status,
-      details: errText,
-    });
-  }
-
-  const data = await apiResponse.json();
-
-  if (data.type === "error") {
-    console.error("Anthropic API error:", JSON.stringify(data.error));
-    return response(422, {
-      error: data.error?.message || "Model returned an error.",
-    });
-  }
-
-  const responseText = data.content?.[0]?.text || "";
-  const stopReason = data.stop_reason;
-  if (!responseText) {
-    return response(422, { error: "Model returned empty response. Try again." });
+  const r = await callLLM(modelInput, systemPrompt, userMessage, xlMode ? 16384 : 8192);
+  if (!r.ok) {
+    return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
 
   // Parse JSON and expand short keys to full keys
-  const resumeData = expandKeys(extractJSON(responseText));
+  const resumeData = expandKeys(extractJSON(r.text));
   if (!resumeData) {
-    const truncated = stopReason === "max_tokens";
     return response(422, {
-      error: truncated
+      error: r.truncated
         ? "Model response was cut off (too long)."
         : "Model returned invalid JSON. Try again.",
-      raw_preview: responseText.substring(0, 500),
+      raw_preview: r.text.substring(0, 500),
     });
   }
 
@@ -370,8 +364,8 @@ async function handleOptimize(body) {
     resumeData,
     scoring,
     timeline_warnings,
-    model_used: data.model || model,
-    usage: data.usage || null,
+    model_used: r.modelUsed,
+    usage: r.usage,
     mode: "optimize",
   });
 }
@@ -397,11 +391,12 @@ async function handleBuild(body) {
 
 function handleModels() {
   return response(200, {
-    default: "claude-opus-4.6",
-    models: Object.entries(ANTHROPIC_MODELS).map(([alias, id]) => ({
+    default: DEFAULT_MODEL_ALIAS,
+    models: Object.entries(MODELS).map(([alias, m]) => ({
       alias,
-      id,
-      provider: "anthropic",
+      id: m.id,
+      provider: m.provider,
+      label: m.label,
     })),
   });
 }
@@ -450,7 +445,7 @@ if (typeof awslambda !== "undefined") {
     const body = parseBody(event);
 
     // Determine which mode (analyze or optimize)
-    let systemPrompt, userMessage, model, mode;
+    let systemPrompt, userMessage, modelAlias, mode;
 
     let dom = "software";
     if (path.includes("/optimize") && method === "POST") {
@@ -460,7 +455,7 @@ if (typeof awslambda !== "undefined") {
       dom = domain || "software";
       systemPrompt = buildOptimizeSystemPrompt(dom, includeCertifications);
       userMessage = buildOptimizeUserMessage(resume, jd, context);
-      model = resolveModel(modelInput);
+      modelAlias = modelInput;
       mode = "optimize";
     } else if (path.includes("/analyze") && method === "POST") {
       const { jd, customer, context, model: modelInput, companies, domain, includeCertifications } = body;
@@ -468,7 +463,7 @@ if (typeof awslambda !== "undefined") {
       dom = domain || "software";
       systemPrompt = buildSystemPrompt(dom, includeCertifications);
       userMessage = buildUserMessage(jd, customer, context, companies, dom);
-      model = resolveModel(modelInput);
+      modelAlias = modelInput;
       mode = "generate";
     } else {
       return streamError(404, "Not found");
@@ -488,27 +483,49 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call Anthropic Messages API with streaming (4 min timeout)
+    // Call the selected provider with streaming (4 min timeout)
+    const m = modelInfo(modelAlias);
     let apiResponse;
     try {
-      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: AbortSignal.timeout(240_000),
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 4096,
-          stream: true,
-          system: systemPrompt,
-          messages: [
-            { role: "user", content: userMessage },
-          ],
-        }),
-      });
+      if (m.provider === "openai") {
+        apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          signal: AbortSignal.timeout(240_000),
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: m.id,
+            max_completion_tokens: 4096,
+            response_format: { type: "json_object" },
+            stream: true,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage },
+            ],
+          }),
+        });
+      } else {
+        apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          signal: AbortSignal.timeout(240_000),
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: m.id,
+            max_tokens: 4096,
+            stream: true,
+            system: systemPrompt,
+            messages: [
+              { role: "user", content: userMessage },
+            ],
+          }),
+        });
+      }
     } catch (err) {
       const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
       const msg = isTimeout
@@ -548,12 +565,19 @@ if (typeof awslambda !== "undefined") {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
 
         try {
           const parsed = JSON.parse(data);
-          if (parsed.type === "content_block_delta" && parsed.delta?.text) {
-            fullText += parsed.delta.text;
-            responseStream.write(`data: ${JSON.stringify({ type: "content", delta: parsed.delta.text })}\n\n`);
+          let delta = null;
+          if (m.provider === "openai") {
+            delta = parsed.choices?.[0]?.delta?.content || null;
+          } else if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+            delta = parsed.delta.text;
+          }
+          if (delta) {
+            fullText += delta;
+            responseStream.write(`data: ${JSON.stringify({ type: "content", delta })}\n\n`);
           }
         } catch {}
       }
@@ -571,7 +595,7 @@ if (typeof awslambda !== "undefined") {
         resumeData,
         scoring,
         timeline_warnings,
-        model_used: model,
+        model_used: m.id,
         mode: mode === "optimize" ? "optimize" : undefined,
       })}\n\n`);
     } else {
