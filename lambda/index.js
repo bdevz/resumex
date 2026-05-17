@@ -14,8 +14,9 @@
 const { buildSystemPrompt, buildSystemPromptXL, buildSystemPromptExtended, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeSystemPromptExtended, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
-const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const { userSlug, historyKey, buildHistoryRecord, summarize } = require("./lib/history");
 const crypto = require("crypto");
 
 const s3 = new S3Client({ region: "us-east-1" });
@@ -101,7 +102,7 @@ function response(statusCode, body, extraHeaders = {}) {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+    "Access-Control-Allow-Headers": "Content-Type, X-Passphrase, X-User-Name, X-Admin-Passphrase",
     ...extraHeaders,
   };
   return {
@@ -119,16 +120,31 @@ function binaryResponse(buffer, filename) {
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+      "Access-Control-Allow-Headers": "Content-Type, X-Passphrase, X-User-Name, X-Admin-Passphrase",
     },
     isBase64Encoded: true,
     body: buffer.toString("base64"),
   };
 }
 
+// Case-insensitive header lookup (API Gateway preserves case, Function URL lowercases)
+function getHeader(headers, name) {
+  if (!headers) return undefined;
+  const lower = name.toLowerCase();
+  for (const k of Object.keys(headers)) {
+    if (k.toLowerCase() === lower) return headers[k];
+  }
+  return undefined;
+}
+
 function checkAuth(headers) {
   const passphrase = headers["x-passphrase"] || headers["X-Passphrase"];
   return passphrase && passphrase === process.env.SHARED_PASSPHRASE;
+}
+
+function checkAdmin(headers) {
+  const pass = getHeader(headers, "x-admin-passphrase");
+  return !!pass && !!process.env.ADMIN_PASSPHRASE && pass === process.env.ADMIN_PASSPHRASE;
 }
 
 // Model registry: dropdown alias → { id, provider, label }
@@ -437,7 +453,7 @@ if (typeof awslambda !== "undefined") {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase, X-User-Name, X-Admin-Passphrase",
         },
       });
       responseStream.end();
@@ -451,7 +467,7 @@ if (typeof awslambda !== "undefined") {
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+          "Access-Control-Allow-Headers": "Content-Type, X-Passphrase, X-User-Name, X-Admin-Passphrase",
         },
       });
       responseStream.write(JSON.stringify({ error }));
@@ -507,7 +523,7 @@ if (typeof awslambda !== "undefined") {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
+        "Access-Control-Allow-Headers": "Content-Type, X-Passphrase, X-User-Name, X-Admin-Passphrase",
       },
     });
 
@@ -663,6 +679,44 @@ async function readJobResult(jobId) {
   }
 }
 
+// ── Resume history helpers (per-user, stored in the same bucket) ──
+
+async function writeHistory(record) {
+  const key = historyKey(userSlug(record.userName), record.createdAt, record.id);
+  await s3.send(new PutObjectCommand({
+    Bucket: JOB_BUCKET,
+    Key: key,
+    Body: JSON.stringify(record),
+    ContentType: "application/json",
+  }));
+}
+
+// List every full record under a prefix (e.g. "history/jane-doe/" or "history/").
+async function listHistoryRecords(prefix) {
+  const records = [];
+  let token;
+  do {
+    const page = await s3.send(new ListObjectsV2Command({
+      Bucket: JOB_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: token,
+    }));
+    const keys = (page.Contents || []).map((o) => o.Key).filter((k) => k && k.endsWith(".json"));
+    const objs = await Promise.all(keys.map(async (Key) => {
+      try {
+        const obj = await s3.send(new GetObjectCommand({ Bucket: JOB_BUCKET, Key }));
+        return JSON.parse(await obj.Body.transformToString());
+      } catch {
+        return null; // skip unreadable/corrupt entries rather than fail the whole list
+      }
+    }));
+    for (const r of objs) if (r) records.push(r);
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  records.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  return records;
+}
+
 async function startAsyncJob(body, route) {
   const jobId = crypto.randomUUID();
   const asyncPayload = { ...body, __jobId: jobId, __route: route };
@@ -719,6 +773,20 @@ exports.handler = async (event) => {
           usage: resultBody.usage,
           mode: resultBody.mode,
         });
+
+        // Save to per-user history. Best-effort: a failure here must never
+        // affect the generated resume the user is waiting on.
+        try {
+          await writeHistory(buildHistoryRecord({
+            id: jobId,
+            userName: body.__userName,
+            createdAt: new Date().toISOString(),
+            body,
+            resultBody: { ...resultBody, mode: resultBody.mode || (route === "optimize" ? "optimize" : "generate") },
+          }));
+        } catch (histErr) {
+          console.error("History write failed (non-fatal):", histErr);
+        }
       }
     } catch (err) {
       console.error("Async job error:", err);
@@ -763,17 +831,56 @@ exports.handler = async (event) => {
       return response(200, result);
     }
 
+    // Carry the user's name through the async job so it can be saved to history
+    const userName = getHeader(headers, "x-user-name") || "Unknown";
+
     // Start async jobs for analyze/optimize (avoids 30s API GW timeout)
     if (path === "/analyze" && method === "POST") {
-      return await startAsyncJob(body, "analyze");
+      return await startAsyncJob({ ...body, __userName: userName }, "analyze");
     }
 
     if (path === "/optimize" && method === "POST") {
-      return await startAsyncJob(body, "optimize");
+      return await startAsyncJob({ ...body, __userName: userName }, "optimize");
     }
 
     if (path === "/build" && method === "POST") {
       return await handleBuild(body);
+    }
+
+    // ── Resume history ──
+
+    // A user's own history (summaries only, newest first)
+    if (path === "/history/list" && method === "POST") {
+      const records = await listHistoryRecords(`history/${userSlug(userName)}/`);
+      return response(200, { items: records.map(summarize) });
+    }
+
+    // A single full record (for re-view + re-download via /build)
+    if (path === "/history/get" && method === "POST") {
+      const { id, userName: who } = body;
+      if (!id) return response(400, { error: "Missing id" });
+      const slug = userSlug(who || userName);
+      const records = await listHistoryRecords(`history/${slug}/`);
+      const rec = records.find((r) => r.id === id);
+      if (!rec) return response(404, { error: "Not found" });
+      return response(200, { record: rec });
+    }
+
+    // Admin: everyone's history, grouped by user (separate admin passphrase)
+    if (path === "/admin/list" && method === "POST") {
+      if (!checkAdmin(headers)) {
+        return response(401, { error: "Invalid admin passphrase" });
+      }
+      const records = await listHistoryRecords("history/");
+      const usersByName = {};
+      for (const r of records) {
+        const name = r.userName || "Unknown";
+        if (!usersByName[name]) usersByName[name] = { userName: name, count: 0, items: [] };
+        usersByName[name].count += 1;
+        usersByName[name].items.push(summarize(r));
+      }
+      const users = Object.values(usersByName).sort((a, b) => b.count - a.count);
+      return response(200, { users, total: records.length });
     }
 
     return response(404, { error: "Not found", path });

@@ -48,6 +48,10 @@ if [ -z "$SHARED_PASSPHRASE" ]; then
   read -p "  Team passphrase (e.g., team-resume-2026): " SHARED_PASSPHRASE
 fi
 
+if [ -z "$ADMIN_PASSPHRASE" ]; then
+  read -p "  Admin passphrase (for usage review, distinct from team passphrase): " ADMIN_PASSPHRASE
+fi
+
 echo ""
 
 # ── Step 1: Bundle Lambda ──
@@ -94,7 +98,16 @@ INLINE_POLICY=$(cat <<POLICY
     {
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:GetObject"],
-      "Resource": "arn:aws:s3:::resumex-${ACCOUNT_ID}/jobs/*"
+      "Resource": [
+        "arn:aws:s3:::resumex-${ACCOUNT_ID}/jobs/*",
+        "arn:aws:s3:::resumex-${ACCOUNT_ID}/history/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::resumex-${ACCOUNT_ID}",
+      "Condition": { "StringLike": { "s3:prefix": "history/*" } }
     },
     {
       "Effect": "Allow",
@@ -128,7 +141,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --zip-file "fileb://lambda.zip" \
   --timeout 300 \
   --memory-size 512 \
-  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY}" \
+  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY,ADMIN_PASSPHRASE=$ADMIN_PASSPHRASE}" \
   --region "$REGION" \
   --query 'FunctionArn' --output text 2>/dev/null) || {
   echo "  Function exists, updating..."
@@ -145,7 +158,7 @@ LAMBDA_ARN=$(aws lambda create-function \
     --timeout 300 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
-    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY}" \
+    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY,ADMIN_PASSPHRASE=$ADMIN_PASSPHRASE}" \
     --region "$REGION" --output text --query 'FunctionArn' > /dev/null
 
   LAMBDA_ARN=$(aws lambda get-function \
@@ -174,7 +187,7 @@ if [ "$API_ID" = "None" ] || [ -z "$API_ID" ]; then
     --cors-configuration '{
       "AllowOrigins": ["*"],
       "AllowMethods": ["GET", "POST", "OPTIONS"],
-      "AllowHeaders": ["Content-Type", "X-Passphrase"],
+      "AllowHeaders": ["Content-Type", "X-Passphrase", "X-User-Name", "X-Admin-Passphrase"],
       "MaxAge": 86400
     }' \
     --region "$REGION" \
@@ -214,6 +227,12 @@ if [ "$API_ID" = "None" ] || [ -z "$API_ID" ]; then
 else
   echo "  Using existing API: $API_ID"
 fi
+
+# Ensure CORS allows all required headers (idempotent — create-api only sets
+# this for brand-new APIs, so existing APIs would otherwise keep stale headers)
+aws apigatewayv2 update-api --api-id "$API_ID" --region "$REGION" \
+  --cors-configuration 'AllowOrigins=*,AllowMethods=GET,POST,OPTIONS,AllowHeaders=content-type,x-passphrase,x-user-name,x-admin-passphrase,MaxAge=86400' \
+  >/dev/null 2>&1 || echo "  (warning: could not update CORS config)"
 
 API_URL="https://${API_ID}.execute-api.${REGION}.amazonaws.com"
 echo "  API URL: $API_URL"
