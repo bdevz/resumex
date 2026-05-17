@@ -661,6 +661,52 @@
       line-height: 1.5;
     }
 
+    /* ── Design Composer ── */
+    .composer { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 720px) { .composer { grid-template-columns: 1fr; } }
+    .composer label.sub { display:block; font-size:11px; text-transform:uppercase;
+      letter-spacing:.04em; color:var(--text-muted); margin:0 0 4px; }
+    .composer select, .composer .seg { width:100%; margin-bottom:10px; }
+    .seg { display:flex; flex-wrap:wrap; gap:6px; }
+    .seg button { flex:1 1 auto; padding:6px 8px; font-size:12px; cursor:pointer;
+      background:var(--surface); color:var(--text); border:1px solid var(--border);
+      border-radius:6px; }
+    .seg button.on { border-color:var(--accent); background:var(--surface-2);
+      color:var(--text); font-weight:600; }
+    .swatches { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .swatch { width:26px; height:26px; border-radius:50%; cursor:pointer;
+      border:2px solid var(--border); }
+    .swatch.on { border-color:var(--text); box-shadow:0 0 0 2px var(--accent); }
+    .sectlist { list-style:none; padding:0; margin:0 0 10px; }
+    .sectlist li { display:flex; align-items:center; gap:8px; padding:5px 8px;
+      background:var(--surface); border:1px solid var(--border); border-radius:6px;
+      margin-bottom:4px; font-size:13px; }
+    .sectlist li .nm { flex:1; text-transform:capitalize; }
+    .sectlist li.hidden .nm { opacity:.4; text-decoration:line-through; }
+    .sectlist li button { background:none; border:none; color:var(--text-muted);
+      cursor:pointer; font-size:13px; padding:2px 4px; }
+    .elements { display:flex; flex-wrap:wrap; gap:10px 16px; margin-bottom:10px; }
+    .elements label { display:inline-flex; align-items:center; gap:6px;
+      font-size:13px; cursor:pointer; }
+    .elements input { width:auto; accent-color:var(--accent); }
+    .composer-preview { border:1px solid var(--border); border-radius:8px;
+      background:#666; padding:14px; overflow:auto; max-height:520px; }
+    .rx-page { background:#fff; color:#222; width:100%; max-width:430px;
+      margin:0 auto; padding:26px 30px; font-family:Calibri,Arial,sans-serif;
+      font-size:9px; line-height:1.45; box-shadow:0 2px 10px rgba(0,0,0,.3); }
+    .rx-flex { display:flex; gap:14px; }
+    .rx-side { width:34%; padding:14px 12px; }
+    .rx-main { flex:1; padding:6px 0; }
+    .rx-name { font-weight:700; margin-bottom:2px; }
+    .rx-h { font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+      font-size:8.5px; margin:10px 0 4px; }
+    .rx-bar { height:5px; background:#d6d6d6; border-radius:2px; margin:4px 0; }
+    .rx-bar.s { width:70%; } .rx-bar.m { width:88%; } .rx-bar.l { width:100%; }
+    .rx-co { font-weight:700; margin-top:7px; }
+    .rx-callout { border-left:3px solid; padding:7px 9px; margin:4px 0; }
+    .rx-skillrow { padding:3px 6px; margin:3px 0; }
+    .rx-hr { border:0; border-top:1px solid #ccc; margin:9px 0; }
+
     .edu-toggle {
       display: inline-flex;
       align-items: center;
@@ -826,16 +872,86 @@
       </div>
 
       <div class="field-group">
-        <label>Resume Template</label>
-        <div class="template-grid" id="template-grid"></div>
-        <div id="ats-warning" class="ats-warning" style="display:none;">
-          This template uses a two-column layout that may not parse correctly in all ATS systems. Use single-column templates for maximum compatibility.
+        <label>Resume Design</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+          <button type="button" class="btn-secondary" id="compose-btn" onclick="composeUnique()"
+            style="padding:8px 14px;font-size:13px;">⚡ Compose a unique design</button>
+          <span style="color:var(--text-muted);font-size:12px;">A clean, ATS-safe single-column design is picked for you.</span>
         </div>
-        <label class="edu-toggle">
-          <input type="checkbox" id="xl-mode" checked>
-          <span>XL</span>
-          <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">(3 pages, 10+ bullets, keyword-heavy)</span>
-        </label>
+
+        <div class="composer">
+          <div>
+            <label class="sub">Length</label>
+            <div class="seg" id="seg-length">
+              <button type="button" data-v="standard">Standard · 2 pg</button>
+              <button type="button" data-v="xl">Long · 3 pg</button>
+              <button type="button" data-v="extended" class="on">Extended · 3–4 pg</button>
+            </div>
+
+            <button type="button" class="btn-secondary" id="customize-toggle"
+              onclick="toggleAdvanced()" style="padding:7px 12px;font-size:13px;margin-bottom:10px;">
+              Customize design ▾
+            </button>
+
+            <div id="advanced" style="display:none;">
+              <label class="sub">Layout</label>
+              <select id="sel-layout">
+                <optgroup label="Single column — ATS-safe (recommended)">
+                  <option value="single-centered">Centered header</option>
+                  <option value="single-left">Left-aligned header</option>
+                  <option value="single-split">Split header (name left, contact right)</option>
+                  <option value="single-banner">Banner (accent rule under header)</option>
+                </optgroup>
+                <optgroup label="Two column — may break ATS parsing">
+                  <option value="two-column-left">Sidebar left</option>
+                  <option value="two-column-right">Sidebar right</option>
+                </optgroup>
+              </select>
+
+              <label class="sub">Accent color</label>
+              <div class="swatches" id="swatches"></div>
+
+              <label class="sub">Typography</label>
+              <select id="sel-typography">
+                <option value="calibri-clean">Calibri — clean sans</option>
+                <option value="georgia-serif">Georgia headings + Calibri body</option>
+                <option value="georgia-exec">Georgia executive (large name)</option>
+              </select>
+
+              <label class="sub">Section header style</label>
+              <select id="sel-header">
+                <option value="bottom-border" selected>Underline</option>
+                <option value="plain">Plain</option>
+                <option value="top-bottom">Top + bottom rule</option>
+                <option value="shading">Shaded band</option>
+                <option value="thick-bottom">Thick underline</option>
+              </select>
+
+              <label class="sub">Sections (toggle / reorder)</label>
+              <ul class="sectlist" id="sectlist"></ul>
+
+              <label class="sub">Design elements <span style="text-transform:none;color:var(--text-muted);">(tables/photo may reduce ATS compatibility)</span></label>
+              <div class="elements" id="elements">
+                <label><input type="checkbox" data-el="skillBars"> Skill bands</label>
+                <label><input type="checkbox" data-el="dividers"> Dividers</label>
+                <label><input type="checkbox" data-el="callout"> Summary callout</label>
+                <label><input type="checkbox" data-el="icons"> Contact icons</label>
+                <label><input type="checkbox" data-el="headshot"> Headshot</label>
+              </div>
+              <input type="file" id="headshot-file" accept="image/png,image/jpeg"
+                style="display:none;" onchange="onHeadshot(event)">
+            </div>
+          </div>
+
+          <div>
+            <label class="sub">Live preview (approximation)</label>
+            <div class="composer-preview" id="composer-preview"></div>
+          </div>
+        </div>
+
+        <div id="ats-warning" class="ats-warning" style="display:none;">
+          This design uses a two-column layout / photo / icons that may not parse correctly in all ATS systems. The default single-column design is the safest for applicant tracking systems.
+        </div>
         <label class="edu-toggle">
           <input type="checkbox" id="include-education" checked>
           <span>Include education section</span>
@@ -947,7 +1063,31 @@
     let currentResumeData = null;
     let currentPassphrase = null;
     let currentMode = "optimize"; // "optimize" or "generate"
-    let selectedTemplate = "classic";
+    // Composable design state (mirrors lambda/lib/design.js spec).
+    const designState = {
+      length: "extended",
+      layout: "single-centered",
+      palette: "royal",
+      typography: "calibri-clean",
+      headerStyle: "bottom-border",
+      sectionOrder: ["contact","summary","skills","experience","projects","education","certifications"],
+      sectionVisibility: { contact:true, summary:true, skills:true, experience:true, projects:false, education:true, certifications:true },
+      elements: { skillBars:false, dividers:false, callout:false, icons:false, headshot:false },
+      photo: null,
+    };
+    // name/contact treatment per single-column variant (mirrors design.js)
+    const SINGLE_VARIANT_HEADER = {
+      "single-centered": "centered",
+      "single-left": "left",
+      "single-split": "split",
+      "single-banner": "banner",
+    };
+    function headerTreatmentOf() {
+      return SINGLE_VARIANT_HEADER[designState.layout] || "left";
+    }
+    function isTwoColLayout() {
+      return designState.layout === "two-column-left" || designState.layout === "two-column-right";
+    }
 
     // ── API base ──
     const API_BASE = "%%API_URL%%";
@@ -1034,55 +1174,225 @@
       sel.addEventListener("change", update);
     })();
 
-    // ── Template Options ──
-    const TEMPLATE_OPTIONS = [
-      { id: "classic",        name: "Classic",        ats: true,  type: "Single column" },
-      { id: "elegant",        name: "Elegant",        ats: true,  type: "Single column" },
-      { id: "single-column",  name: "Single Column",  ats: true,  type: "Single column" },
-      { id: "ivy-league",     name: "Ivy League",     ats: true,  type: "Single column" },
-      { id: "executive",      name: "Executive",      ats: true,  type: "Single column" },
-      { id: "highlight",      name: "Highlight",      ats: true,  type: "Single column" },
-      { id: "compact",        name: "Compact",        ats: true,  type: "Single column" },
-      { id: "accent",         name: "Accent",         ats: true,  type: "Single column" },
-      { id: "minimal",        name: "Minimal",        ats: true,  type: "Single column" },
-      { id: "professional",   name: "Professional",   ats: true,  type: "Single column" },
-      { id: "modern",         name: "Modern",         ats: false, type: "Two column" },
-      { id: "timeline",       name: "Timeline",       ats: false, type: "Two column" },
-      { id: "polished",       name: "Polished",       ats: false, type: "Two column" },
-      { id: "creative",       name: "Creative",       ats: false, type: "Two column" },
-      { id: "stylish",        name: "Stylish",        ats: false, type: "Two column" },
-    ];
+    // ── Design Composer ──
+    // Palette hexes mirror PALETTES in lambda/lib/design.js (preview parity).
+    const PALETTE_HEX = {
+      ink:    { c:"#000000", s:"#1B2A4A", st:"#FFFFFF" },
+      teal:   { c:"#1A7A7A", s:"#1A7A7A", st:"#FFFFFF" },
+      royal:  { c:"#2B579A", s:"#F0F4F8", st:"#333333" },
+      navy:   { c:"#1B2A4A", s:"#1B2A4A", st:"#FFFFFF" },
+      amber:  { c:"#B8860B", s:"#2D2D2D", st:"#FFFFFF" },
+      maroon: { c:"#8B0000", s:"#8B0000", st:"#FFFFFF" },
+      slate:  { c:"#444444", s:"#2D2D2D", st:"#FFFFFF" },
+      sky:    { c:"#4A90D9", s:"#2D2D2D", st:"#FFFFFF" },
+    };
+    const FONT_FACE = {
+      "calibri-clean": { h:"Calibri,Arial,sans-serif", b:"Calibri,Arial,sans-serif" },
+      "georgia-serif": { h:"Georgia,serif",            b:"Calibri,Arial,sans-serif" },
+      "georgia-exec":  { h:"Georgia,serif",            b:"Calibri,Arial,sans-serif" },
+    };
 
-    function renderTemplateGrid() {
-      var grid = document.getElementById("template-grid");
-      grid.innerHTML = "";
-      for (var i = 0; i < TEMPLATE_OPTIONS.length; i++) {
-        var t = TEMPLATE_OPTIONS[i];
-        var card = document.createElement("div");
-        card.className = "template-card" + (t.id === selectedTemplate ? " selected" : "");
-        card.setAttribute("data-id", t.id);
-        card.onclick = (function(id) { return function() { selectTemplate(id); }; })(t.id);
-        card.innerHTML =
-          '<div class="template-preview"><img src="templates/' + t.id + '.jpg" alt="' + t.name + ' template"></div>' +
-          '<div class="template-name">' + t.name + '</div>' +
-          '<div class="template-meta">' +
-            '<span class="template-type">' + t.type + '</span>' +
-            '<span class="template-badge ' + (t.ats ? 'badge-safe' : 'badge-warn') + '">' +
-              (t.ats ? 'ATS Safe' : 'ATS Warning') +
-            '</span>' +
-          '</div>';
-        grid.appendChild(card);
+    function lighten(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n>>16)&255, g=(n>>8)&255, b=n&255;
+      const m = x => Math.round(x + (255-x)*0.86);
+      return "rgb(" + m(r) + "," + m(g) + "," + m(b) + ")";
+    }
+
+    function segWire(id, key) {
+      document.querySelectorAll("#" + id + " button").forEach(function(btn){
+        btn.onclick = function(){
+          designState[key] = btn.getAttribute("data-v");
+          document.querySelectorAll("#" + id + " button").forEach(function(b){ b.classList.remove("on"); });
+          btn.classList.add("on");
+          afterChange();
+        };
+      });
+    }
+
+    function renderSwatches() {
+      const wrap = document.getElementById("swatches");
+      wrap.innerHTML = "";
+      Object.keys(PALETTE_HEX).forEach(function(k){
+        const el = document.createElement("div");
+        el.className = "swatch" + (designState.palette === k ? " on" : "");
+        el.style.background = PALETTE_HEX[k].c;
+        el.title = k;
+        el.onclick = function(){ designState.palette = k; renderSwatches(); afterChange(); };
+        wrap.appendChild(el);
+      });
+    }
+
+    function renderSectList() {
+      const ul = document.getElementById("sectlist");
+      ul.innerHTML = "";
+      designState.sectionOrder.forEach(function(sec, i){
+        const li = document.createElement("li");
+        if (designState.sectionVisibility[sec] === false) li.className = "hidden";
+        li.innerHTML =
+          '<input type="checkbox" ' + (designState.sectionVisibility[sec] !== false ? "checked" : "") + '>' +
+          '<span class="nm">' + sec + '</span>' +
+          '<button title="up">▲</button><button title="down">▼</button>';
+        const cb = li.querySelector("input");
+        cb.onchange = function(){ designState.sectionVisibility[sec] = cb.checked; renderSectList(); afterChange(); };
+        const btns = li.querySelectorAll("button");
+        btns[0].onclick = function(){ if (i>0){ const o=designState.sectionOrder; [o[i-1],o[i]]=[o[i],o[i-1]]; renderSectList(); afterChange(); } };
+        btns[1].onclick = function(){ const o=designState.sectionOrder; if (i<o.length-1){ [o[i+1],o[i]]=[o[i],o[i+1]]; renderSectList(); afterChange(); } };
+        ul.appendChild(li);
+      });
+    }
+
+    function wireElements() {
+      document.querySelectorAll('#elements input[data-el]').forEach(function(cb){
+        cb.checked = !!designState.elements[cb.getAttribute("data-el")];
+        cb.onchange = function(){
+          const key = cb.getAttribute("data-el");
+          if (key === "headshot" && cb.checked && !designState.photo) {
+            document.getElementById("headshot-file").click();
+          }
+          designState.elements[key] = cb.checked;
+          afterChange();
+        };
+      });
+    }
+
+    function onHeadshot(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = function(){ designState.photo = r.result; designState.elements.headshot = true; afterChange(); };
+      r.readAsDataURL(f);
+    }
+
+    function syncControls() {
+      document.querySelectorAll("#seg-length button").forEach(function(b){
+        b.classList.toggle("on", b.getAttribute("data-v") === designState.length);
+      });
+      document.getElementById("sel-layout").value = designState.layout;
+      document.getElementById("sel-typography").value = designState.typography;
+      document.getElementById("sel-header").value = designState.headerStyle;
+      renderSwatches();
+      renderSectList();
+      wireElements();
+    }
+
+    function toggleAdvanced() {
+      const a = document.getElementById("advanced");
+      const open = a.style.display === "none";
+      a.style.display = open ? "block" : "none";
+      document.getElementById("customize-toggle").textContent =
+        (open ? "Hide customization ▴" : "Customize design ▾");
+    }
+
+    function buildDesignSpec() {
+      return {
+        layout: designState.layout,
+        palette: designState.palette,
+        typography: designState.typography,
+        headerStyle: designState.headerStyle,
+        density: designState.length,
+        sectionOrder: designState.sectionOrder.slice(),
+        sectionVisibility: Object.assign({}, designState.sectionVisibility),
+        elements: Object.assign({}, designState.elements),
+      };
+    }
+
+    function isTwoCol() { return isTwoColLayout(); }
+
+    function updateAtsWarning() {
+      const risky = isTwoCol() || designState.elements.headshot || designState.elements.icons;
+      document.getElementById("ats-warning").style.display = risky ? "block" : "none";
+    }
+
+    function renderPreview() {
+      const pal = PALETTE_HEX[designState.palette];
+      const ff = FONT_FACE[designState.typography];
+      const el = designState.elements;
+      const hs = (designState.headerStyle);
+      function headStyle() {
+        if (hs === "plain") return "";
+        if (hs === "shading") return "background:" + lighten(pal.c) + ";padding:2px 5px;";
+        if (hs === "top-bottom") return "border-top:1px solid " + pal.c + ";border-bottom:1px solid " + pal.c + ";padding:2px 0;";
+        if (hs === "thick-bottom") return "border-bottom:3px solid " + pal.c + ";";
+        return "border-bottom:1px solid " + pal.c + ";";
       }
+      function H(t){ return '<div class="rx-h" style="color:' + pal.c + ';' + headStyle() + '">' + t + '</div>'; }
+      const treat = isTwoCol() ? "left" : headerTreatmentOf();
+      function sectionHTML(sec) {
+        if (designState.sectionVisibility[sec] === false) return "";
+        if (sec === "contact") {
+          const align = (treat === "centered") ? "center" : "left";
+          const nameSz = designState.typography === "georgia-exec" ? "15px" : "13px";
+          const photo = el.headshot ? '<span style="display:inline-block;width:34px;height:34px;border-radius:50%;background:#ccc;vertical-align:middle;margin-right:6px;"></span>' : '';
+          const nm = '<span class="rx-name" style="color:' + pal.c + ';font-family:' + ff.h + ';font-size:' + nameSz + ';">' + photo + 'VIOLET RODRIGUEZ</span>';
+          const ct = el.icons ? '☎ (555) 123-4567   ✉ violet@email.com' : 'New York, NY · violet@email.com · (555) 123-4567';
+          if (treat === "split") {
+            return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">'
+              + nm + '<span style="color:#666;font-size:8px;">' + ct + '</span></div>';
+          }
+          let h = '<div style="text-align:' + align + ';">' + nm + '<div style="color:#666;">' + ct + '</div></div>';
+          if (treat === "banner") h += '<div style="border-bottom:3px solid ' + pal.c + ';margin:5px 0 8px;"></div>';
+          return h;
+        }
+        if (sec === "summary") return H("Summary") + (el.callout
+          ? '<div class="rx-callout" style="border-color:' + pal.c + ';background:' + lighten(pal.c) + ';">Backend engineer focused on payments infra and developer tooling.</div>'
+          : '<div class="rx-bar l"></div><div class="rx-bar m"></div>');
+        if (sec === "skills") return H("Skills") + (el.skillBars
+          ? '<div class="rx-skillrow" style="background:' + lighten(pal.c) + ';"><b>Languages:</b> Go, Python</div><div class="rx-skillrow" style="background:' + lighten(pal.c) + ';"><b>Cloud:</b> AWS, K8s</div>'
+          : '<div class="rx-bar m"></div><div class="rx-bar s"></div>');
+        if (sec === "experience") return H("Experience")
+          + '<div class="rx-co">Acme Technologies<span style="float:right;color:#888;font-weight:400;">2022 — Present</span></div><div style="font-style:italic;color:#666;">Senior Software Engineer</div><div class="rx-bar l"></div><div class="rx-bar m"></div><div class="rx-bar l"></div>';
+        if (sec === "projects") return H("Projects") + '<div class="rx-co">Internal Platform</div><div class="rx-bar m"></div>';
+        if (sec === "education") return H("Education") + '<div class="rx-co">UC Berkeley<span style="float:right;color:#888;font-weight:400;">2017</span></div><div style="color:#666;">B.S. Computer Science</div>';
+        if (sec === "certifications") return H("Certifications") + '<div class="rx-bar s"></div>';
+        return "";
+      }
+      const order = designState.sectionOrder;
+      let html;
+      if (isTwoCol()) {
+        const sideKeys = ["contact","skills","education"];
+        const side = sideKeys.filter(function(s){ return designState.sectionVisibility[s] !== false; }).map(sectionHTML).join("");
+        const main = order.filter(function(s){ return sideKeys.indexOf(s) === -1 && designState.sectionVisibility[s] !== false; }).map(sectionHTML).join((el.dividers ? '<hr class="rx-hr">' : ""));
+        const sideBox = '<div class="rx-side" style="background:' + pal.s + ';color:' + pal.st + ';">' + side + '</div>';
+        const mainBox = '<div class="rx-main">' + main + '</div>';
+        html = '<div class="rx-flex">' + (designState.layout === "two-column-right" ? mainBox + sideBox : sideBox + mainBox) + '</div>';
+      } else {
+        html = order.filter(function(s){ return designState.sectionVisibility[s] !== false; }).map(sectionHTML).join((el.dividers ? '<hr class="rx-hr">' : ""));
+      }
+      document.getElementById("composer-preview").innerHTML =
+        '<div class="rx-page" style="font-family:' + ff.b + ';">' + html + '</div>';
     }
 
-    function selectTemplate(id) {
-      selectedTemplate = id;
-      renderTemplateGrid();
-      var tmpl = TEMPLATE_OPTIONS.find(function(t) { return t.id === id; });
-      document.getElementById("ats-warning").style.display = tmpl && !tmpl.ats ? "block" : "none";
+    function afterChange() {
+      updateAtsWarning();
+      renderPreview();
     }
 
-    renderTemplateGrid();
+    // Compose a clean, ATS-safe, unique SINGLE-COLUMN design (mirrors the
+    // backend composeDesign: single variants only, no tables/photo/icons).
+    function composeUnique() {
+      const seed = Date.now() ^ Math.floor(Math.random() * 1e9);
+      function r(n){ return Math.floor((Math.sin(seed * (n + 1)) * 10000 % 1 + 1) % 1 * 1000); }
+      const variants = Object.keys(SINGLE_VARIANT_HEADER);
+      const pals = Object.keys(PALETTE_HEX);
+      const fonts = Object.keys(FONT_FACE);
+      const heads = ["plain","bottom-border","top-bottom","shading","thick-bottom"];
+      designState.layout = variants[r(1) % variants.length];
+      designState.palette = pals[r(2) % pals.length];
+      designState.typography = fonts[r(3) % fonts.length];
+      designState.headerStyle = heads[r(4) % heads.length];
+      designState.elements = { skillBars:false, dividers: r(6) % 2 === 0, callout:false, icons:false, headshot:false };
+      designState.photo = null;
+      syncControls();
+      afterChange();
+    }
+
+    segWire("seg-length", "length");
+    document.getElementById("sel-layout").onchange = function(){ designState.layout = this.value; afterChange(); };
+    document.getElementById("sel-typography").onchange = function(){ designState.typography = this.value; afterChange(); };
+    document.getElementById("sel-header").onchange = function(){ designState.headerStyle = this.value; afterChange(); };
+    // Best unique ATS-safe design by default on load.
+    composeUnique();
 
     // ── Mode switching ──
     function setMode(mode) {
@@ -1312,7 +1622,7 @@
       startProgress();
 
       // Build request
-      const xlMode = document.getElementById("xl-mode").checked;
+      const length = designState.length;
       const domain = document.getElementById("domain-select").value;
       const includeCertifications = document.getElementById("include-certifications").checked;
       let endpoint, payload;
@@ -1320,7 +1630,7 @@
         endpoint = "/optimize";
         payload = {
           resume: document.getElementById("resume-input").value.trim(),
-          jd, model, xlMode, domain, includeCertifications,
+          jd, model, length, domain, includeCertifications,
           context: context || undefined,
         };
       } else {
@@ -1328,7 +1638,7 @@
         const customer = document.getElementById("customer-input").value.trim();
         const companies = getCompaniesData();
         payload = {
-          jd, model, xlMode, domain, includeCertifications,
+          jd, model, length, domain, includeCertifications,
           customer: customer || undefined,
           context: context || undefined,
           companies: companies.length > 0 ? companies : undefined,
@@ -1551,12 +1861,20 @@
             "Content-Type": "application/json",
             "X-Passphrase": currentPassphrase,
           },
-          body: JSON.stringify({
-            resumeData: currentResumeData,
-            template: selectedTemplate,
-            includeEducation: document.getElementById("include-education").checked,
-            xlMode: document.getElementById("xl-mode").checked,
-          }),
+          body: JSON.stringify((function(){
+            let rd = currentResumeData;
+            if (designState.elements.headshot && designState.photo) {
+              rd = Object.assign({}, currentResumeData, {
+                contact: Object.assign({}, currentResumeData.contact || {}, { photo: designState.photo }),
+              });
+            }
+            return {
+              resumeData: rd,
+              design: buildDesignSpec(),
+              length: designState.length,
+              includeEducation: document.getElementById("include-education").checked,
+            };
+          })()),
         });
 
         if (!resp.ok) {

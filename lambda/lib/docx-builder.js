@@ -5,10 +5,11 @@
 const {
   Document, Packer, Paragraph, TextRun, TabStopType, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
-  VerticalAlign,
+  VerticalAlign, ImageRun,
 } = require("docx");
 const config = require("./config");
 const { TEMPLATES } = require("./templates");
+const { resolveDesign, specToTmpl } = require("./design");
 
 // ── Utilities ──
 
@@ -564,31 +565,429 @@ function buildTwoColumnDoc(resumeData, contact, education, tmpl) {
   });
 }
 
+// ── Composable element renderers (new design engine) ──
+
+function contentWidthOf(tmpl) {
+  const m = tmpl.page.margins;
+  return tmpl.sidebar ? tmpl.sidebar.mainWidthDxa - 600 : 12240 - m.left - m.right;
+}
+
+// A thin horizontal rule between sections (elements.dividers).
+function createDivider(tmpl, colorOverride) {
+  return new Paragraph({
+    children: [new TextRun({ text: "" })],
+    spacing: { before: 60, after: 120 },
+    border: {
+      bottom: {
+        style: BorderStyle.SINGLE,
+        color: colorOverride || tmpl.colors.subtleText,
+        size: 4,
+        space: 1,
+      },
+    },
+  });
+}
+
+// Headshot image paragraph (elements.headshot + contact.photo data URL/base64).
+function createHeadshot(contact, tmpl) {
+  if (!contact || !contact.photo) return null;
+  try {
+    const m = String(contact.photo).match(/^data:image\/(png|jpe?g|gif);base64,(.+)$/i);
+    const b64 = m ? m[2] : contact.photo;
+    const type = m ? (m[1].toLowerCase().startsWith("jp") ? "jpg" : m[1].toLowerCase()) : "png";
+    const data = Buffer.from(b64, "base64");
+    if (!data.length) return null;
+    return new Paragraph({
+      alignment: getAlignment(tmpl),
+      spacing: { after: 80 },
+      children: [
+        new ImageRun({ data, type, transformation: { width: 96, height: 96 } }),
+      ],
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Skills as accent-banded rows (elements.skillBars). No fabricated proficiency
+// values — the bar is a decorative accent band, not a fake skill rating.
+function createSkillBars(skills, tmpl, colorOverride) {
+  const rows = [];
+  const fCat = tmpl.fonts.skillsCategory;
+  const fItems = tmpl.fonts.skillsItems;
+  const width = contentWidthOf(tmpl);
+  const bandFill = (tmpl.sectionHeader.shading && tmpl.sectionHeader.shading.fill) || "EEEEEE";
+
+  for (const [category, items] of Object.entries(skills)) {
+    if (!items || !items.trim()) continue;
+    rows.push(new TableRow({
+      children: [
+        new TableCell({
+          width: { size: width, type: WidthType.DXA },
+          borders: noBorders,
+          shading: { type: ShadingType.CLEAR, fill: bandFill, color: "auto" },
+          margins: { top: 40, bottom: 40, left: 120, right: 120 },
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${category}: `,
+                  font: fCat.face, size: fCat.size, bold: true,
+                  color: colorOverride || tmpl.colors.primary,
+                }),
+                new TextRun({
+                  text: items,
+                  font: fItems.face, size: fItems.size,
+                  color: colorOverride || tmpl.colors.bodyText,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    }));
+  }
+  if (rows.length === 0) return [];
+  return [new Table({
+    rows,
+    width: { size: width, type: WidthType.DXA },
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "FFFFFF" },
+      insideVertical: noBorder,
+    },
+  })];
+}
+
+// Highlighted summary block (elements.callout).
+function createCallout(text, tmpl, colorOverride) {
+  const f = tmpl.fonts.body;
+  const width = contentWidthOf(tmpl);
+  const fill = (tmpl.sectionHeader.shading && tmpl.sectionHeader.shading.fill) || "F2F4F7";
+  return new Table({
+    width: { size: width, type: WidthType.DXA },
+    borders: {
+      top: noBorder, bottom: noBorder,
+      left: { style: BorderStyle.SINGLE, size: 18, color: colorOverride || tmpl.colors.accent },
+      right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder,
+    },
+    rows: [new TableRow({
+      children: [new TableCell({
+        width: { size: width, type: WidthType.DXA },
+        borders: noBorders,
+        shading: { type: ShadingType.CLEAR, fill, color: "auto" },
+        margins: { top: 160, bottom: 160, left: 220, right: 220 },
+        children: [new Paragraph({
+          children: [new TextRun({
+            text, font: f.face, size: f.size,
+            color: colorOverride || tmpl.colors.bodyText,
+          })],
+        })],
+      })],
+    })],
+  });
+}
+
+function createProjectsSection(projects, tmpl, colorOverride) {
+  const out = [];
+  const fCompany = tmpl.fonts.company;
+  const fBody = tmpl.fonts.body;
+  const textColor = colorOverride || tmpl.colors.bodyText;
+  for (const p of projects || []) {
+    out.push(new Paragraph({
+      children: [
+        new TextRun({
+          text: p.name || p.title || "Project",
+          font: fCompany.face, size: fCompany.size, bold: true,
+          color: colorOverride || tmpl.colors.primary,
+        }),
+        ...(p.tech ? [new TextRun({
+          text: `  •  ${p.tech}`,
+          font: fBody.face, size: fBody.size, italics: true, color: textColor,
+        })] : []),
+      ],
+      spacing: { before: 120, after: 40 },
+    }));
+    if (p.description) {
+      out.push(new Paragraph({
+        children: [new TextRun({ text: p.description, font: fBody.face, size: fBody.size, color: textColor })],
+        spacing: { after: 60 },
+      }));
+    }
+    for (const b of p.bullets || []) {
+      out.push(new Paragraph({
+        children: [new TextRun({ text: `• ${b}`, font: fBody.face, size: fBody.size, color: textColor })],
+        spacing: { after: 60 }, indent: { left: 360 },
+      }));
+    }
+  }
+  return out;
+}
+
+// Name + contact on one line, contact right-aligned (single-split variant).
+function createSplitHeader(contact, tmpl, colorOverride) {
+  const fn = tmpl.fonts.name;
+  const fc = tmpl.fonts.contact;
+  const parts = [contact.phone, contact.email, contact.linkedin, contact.github].filter(Boolean);
+  return new Paragraph({
+    tabStops: [{ type: TabStopType.RIGHT, position: contentWidthOf(tmpl) }],
+    spacing: { after: 80 },
+    children: [
+      new TextRun({
+        text: contact.name, font: fn.face, size: fn.size, bold: true,
+        color: colorOverride || tmpl.colors.primary,
+      }),
+      new TextRun({
+        text: `\t${parts.join("  •  ")}`,
+        font: fc.face, size: fc.size,
+        color: colorOverride || tmpl.colors.subtleText,
+      }),
+    ],
+  });
+}
+
+// Full-width accent rule beneath the header block (single-banner variant).
+function createAccentRule(tmpl, colorOverride) {
+  return new Paragraph({
+    children: [new TextRun({ text: "" })],
+    spacing: { after: 140 },
+    border: {
+      bottom: {
+        style: BorderStyle.SINGLE,
+        color: colorOverride || tmpl.colors.accent,
+        size: 12,
+        space: 1,
+      },
+    },
+  });
+}
+
+// Contact line with optional leading icon glyphs (elements.icons).
+function createContactLineIcons(contact, tmpl, colorOverride) {
+  const f = tmpl.fonts.contact;
+  const parts = [
+    contact.phone   ? `☎ ${contact.phone}` : null,
+    contact.email   ? `✉ ${contact.email}` : null,
+    contact.linkedin ? `in: ${contact.linkedin}` : null,
+    contact.github  ? `gh: ${contact.github}` : null,
+  ].filter(Boolean);
+  return new Paragraph({
+    alignment: getAlignment(tmpl),
+    children: [new TextRun({
+      text: parts.join("   "),
+      font: f.face, size: f.size,
+      color: colorOverride || tmpl.colors.subtleText,
+    })],
+    spacing: { after: 40 },
+  });
+}
+
+// Build one section's nodes (no surrounding spacing — caller adds separators).
+function sectionNodes(section, resumeData, contact, education, tmpl, design, colorOverride) {
+  const el = design.elements;
+  switch (section) {
+    case "contact": {
+      const out = [];
+      const head = el.headshot ? createHeadshot(contact, tmpl) : null;
+      if (head) out.push(head);
+      const treatment = design.headerTreatment || "left";
+      // split/banner only make sense in a full-width single column.
+      if (treatment === "split" && tmpl.layout !== "two-column") {
+        out.push(createSplitHeader(contact, tmpl, colorOverride));
+      } else {
+        out.push(createNameHeader(contact, tmpl, colorOverride));
+        out.push(el.icons
+          ? createContactLineIcons(contact, tmpl, colorOverride)
+          : createContactLine(contact, tmpl, colorOverride));
+        if (treatment === "banner" && tmpl.layout !== "two-column") {
+          out.push(createAccentRule(tmpl, colorOverride));
+        }
+      }
+      return out;
+    }
+    case "summary": {
+      const text = resumeData.professional_summary
+        || "Experienced software engineer with expertise in full-stack development.";
+      return [
+        createSectionHeader(config.ATS_HEADERS.summary, tmpl, colorOverride),
+        el.callout ? createCallout(text, tmpl, colorOverride) : createParagraph(text, tmpl, colorOverride),
+      ];
+    }
+    case "skills": {
+      const skills = resumeData.technical_skills || {};
+      return [
+        createSectionHeader(config.ATS_HEADERS.skills, tmpl, colorOverride),
+        ...(el.skillBars
+          ? createSkillBars(skills, tmpl, colorOverride)
+          : createSkillsSection(skills, tmpl, colorOverride)),
+      ];
+    }
+    case "experience":
+      return [
+        createSectionHeader(config.ATS_HEADERS.experience, tmpl, colorOverride),
+        ...createExperienceSection(resumeData.experience || [], tmpl, colorOverride),
+      ];
+    case "projects": {
+      const projects = resumeData.projects || [];
+      if (!projects.length) return [];
+      return [
+        createSectionHeader(config.ATS_HEADERS.projects, tmpl, colorOverride),
+        ...createProjectsSection(projects, tmpl, colorOverride),
+      ];
+    }
+    case "education":
+      if (!education) return [];
+      return [
+        createSectionHeader(config.ATS_HEADERS.education, tmpl, colorOverride),
+        ...createEducationSection(education, tmpl, colorOverride),
+      ];
+    case "certifications": {
+      const block = createCertificationsBlock(resumeData.certifications, tmpl, colorOverride);
+      // Strip the leading createSpacing() — the generalized path owns separators.
+      return block.length ? block.slice(1) : [];
+    }
+    default:
+      return [];
+  }
+}
+
+function emitSections(sectionList, resumeData, contact, education, tmpl, design, colorOverride) {
+  const children = [];
+  let first = true;
+  for (const section of sectionList) {
+    if (design.sectionVisibility[section] === false) continue;
+    const nodes = sectionNodes(section, resumeData, contact, education, tmpl, design, colorOverride);
+    if (nodes.length === 0) continue;
+    if (!first) {
+      children.push(design.elements.dividers
+        ? createDivider(tmpl, colorOverride)
+        : createSpacing());
+    }
+    children.push(...nodes);
+    first = false;
+  }
+  return children;
+}
+
+function buildComposedSingleColumn(resumeData, contact, education, tmpl, design) {
+  const children = emitSections(
+    design.sectionOrder, resumeData, contact, education, tmpl, design, null
+  );
+  return new Document({
+    sections: [{
+      properties: { page: { margin: { ...tmpl.page.margins } } },
+      children,
+    }],
+  });
+}
+
+function buildComposedTwoColumn(resumeData, contact, education, tmpl, design) {
+  const sidebar = tmpl.sidebar;
+  const isLeft = sidebar.position === "left";
+  const vis = (s) => design.sectionVisibility[s] !== false;
+
+  const sidebarList = sidebar.sidebarSections.filter(vis);
+  const sidebarSet = new Set(sidebar.sidebarSections);
+  const mainList = design.sectionOrder.filter((s) => vis(s) && !sidebarSet.has(s));
+
+  const sidebarColor = isDarkColor(tmpl.colors.sidebarBg) ? "FFFFFF" : null;
+  const sidebarChildren = emitSections(sidebarList, resumeData, contact, education, tmpl, design, sidebarColor);
+  const mainChildren = emitSections(mainList, resumeData, contact, education, tmpl, design, null);
+
+  if (sidebarChildren.length === 0) sidebarChildren.push(new Paragraph(""));
+  if (mainChildren.length === 0) mainChildren.push(new Paragraph(""));
+
+  const sidebarShading = tmpl.colors.sidebarBg ? {
+    type: ShadingType.CLEAR, fill: tmpl.colors.sidebarBg, color: "auto",
+  } : undefined;
+
+  const sidebarCell = new TableCell({
+    width: { size: sidebar.widthDxa, type: WidthType.DXA },
+    children: sidebarChildren,
+    shading: sidebarShading,
+    borders: noBorders,
+    margins: { top: 300, bottom: 300, left: 300, right: 200 },
+    verticalAlign: VerticalAlign.TOP,
+  });
+  const mainCell = new TableCell({
+    width: { size: sidebar.mainWidthDxa, type: WidthType.DXA },
+    children: mainChildren,
+    borders: noBorders,
+    margins: { top: 300, bottom: 300, left: 300, right: 300 },
+    verticalAlign: VerticalAlign.TOP,
+  });
+  const table = new Table({
+    rows: [new TableRow({ children: isLeft ? [sidebarCell, mainCell] : [mainCell, sidebarCell] })],
+    width: { size: sidebar.widthDxa + sidebar.mainWidthDxa, type: WidthType.DXA },
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder,
+    },
+  });
+  return new Document({
+    sections: [{
+      properties: { page: { margin: { ...tmpl.page.margins } } },
+      children: [table],
+    }],
+  });
+}
+
 // ── Main Entry Point ──
+
+// A preset with all extras off and the legacy section order/visibility renders
+// through the original (regression-locked) builders, byte-for-byte unchanged.
+function isLegacyDefault(design) {
+  if (!design.isPreset) return false;
+  const e = design.elements;
+  if (e.skillBars || e.headshot || e.icons || e.dividers || e.callout) return false;
+  const order = design.sectionOrder;
+  const legacy = ["contact", "summary", "skills", "experience", "education", "certifications"];
+  if (order.length !== legacy.length || order.some((s, i) => s !== legacy[i])) return false;
+  for (const [k, v] of Object.entries(design.sectionVisibility)) {
+    if (k === "projects") continue; // off by default, never rendered by legacy path
+    if (v === false) return false;
+  }
+  return true;
+}
 
 async function buildResume(resumeData, customContact = null, options = {}) {
   const {
-    template: templateId = "classic",
+    template: templateId,
+    design: designInput,
     includeEducation = true,
     xlMode = false,
+    length,
   } = options;
 
-  let tmpl = TEMPLATES[templateId] || TEMPLATES.classic;
+  // Resolve the design: explicit spec/preset, else template name, else classic.
+  const design = resolveDesign(designInput != null ? designInput : (templateId || "classic"));
 
-  // XL mode: override margins to narrow for 3-page keyword-heavy resumes
-  if (xlMode) {
-    tmpl = { ...tmpl, page: { ...tmpl.page, margins: config.FORMAT_XL.page.margins } };
+  let tmpl = design.isPreset
+    ? (TEMPLATES[design.presetId] || TEMPLATES.classic)
+    : specToTmpl(design);
+
+  // Length/density: extended ⊃ xl (narrower margins for 3-4 page resumes).
+  const wantXL = xlMode || length === "xl" || length === "extended";
+  const fmt = (length === "extended" && config.FORMAT_EXTENDED)
+    ? config.FORMAT_EXTENDED
+    : (wantXL ? config.FORMAT_XL : null);
+  if (fmt) {
+    tmpl = { ...tmpl, page: { ...tmpl.page, margins: fmt.page.margins } };
   }
+
   const contact = resumeData.contact || customContact || config.CONTACT;
-  const education = includeEducation
-    ? (resumeData.education || [])
-    : null;
+  const education = includeEducation ? (resumeData.education || []) : null;
 
   let doc;
-  if (tmpl.layout === "two-column") {
-    doc = buildTwoColumnDoc(resumeData, contact, education, tmpl);
+  if (isLegacyDefault(design)) {
+    // Original, untouched code paths (regression-locked).
+    doc = tmpl.layout === "two-column"
+      ? buildTwoColumnDoc(resumeData, contact, education, tmpl)
+      : buildSingleColumnDoc(resumeData, contact, education, tmpl);
   } else {
-    doc = buildSingleColumnDoc(resumeData, contact, education, tmpl);
+    doc = tmpl.layout === "two-column"
+      ? buildComposedTwoColumn(resumeData, contact, education, tmpl, design)
+      : buildComposedSingleColumn(resumeData, contact, education, tmpl, design);
   }
 
   return await Packer.toBuffer(doc);

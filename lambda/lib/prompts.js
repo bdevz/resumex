@@ -218,6 +218,121 @@ ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.
 CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
 }
 
+function buildSystemPromptExtended(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
+  return `You are a resume generator that creates keyword-heavy, ATS-optimized, design-forward resumes using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 3 pages and UP TO 4 pages where EVERY bullet scores 5+ out of 7 on quality. This is NOT a one-pager — depth and breadth are expected.
+
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanations, no extra text
+2. Use the exact JSON schema provided below
+3. Generate realistic work history with 3-4 companies over 6-7 years
+4. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
+5. EVERY bullet MUST include: (a) strong action verb, (b) specific technology/framework name
+6. Most bullets should include a quantifiable metric, but not ALL — see WRITING STYLE below
+7. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT that overrides keyword density. See TECHNOLOGY TIMELINE below.
+
+Use these SHORT KEYS in your JSON response (saves tokens):
+{
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
+  },
+  "ps": "6-9 sentence summary packed with technologies, methodologies, and domain keywords from the JD",
+  "ts": {
+    "lang": "comma-separated list",
+    "fw": "comma-separated list",
+    "cloud": "comma-separated list",
+    "db": "comma-separated list",
+    "tools": "comma-separated list"
+  },
+  "exp": [
+    {
+      "co": "Company Name",
+      "ti": "Job Title",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY",
+      "b": [
+        "XYZ formula bullet with technology name AND metric",
+        "Another XYZ bullet with specific framework AND percentage"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project or Initiative Name",
+      "tech": "comma-separated key technologies",
+      "b": ["What it did and why it mattered (JD keywords, no fabricated metrics required)"]
+    }
+  ]${cert.schemaLine}
+}
+${cert.instruction}${domainContextBlock(c)}
+WORK HISTORY GUIDELINES:
+- Current role: 18-28 months
+- Previous roles: 18-28 months each
+- Include 1-2 IT services companies (${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
+- Use competitor companies from the target industry
+- Each role should have 14-20 detailed bullets
+- The resume MUST span at least 3 pages and may extend to 4 pages — never shorter
+- Include a "projects" array with 2-4 substantial projects/initiatives to add legitimate depth (NOT filler — real, JD-relevant work)
+- Timeline must be realistic (no gaps, no overlaps)
+
+BULLET REQUIREMENTS:
+- Start with a strong, past-tense action verb (${c.PROMPT_VERBS.strong_short})
+- Include specific technologies mentioned in JD
+- Do NOT end bullet points with periods
+- Keep bullets to 1-2 lines (under 250 characters)
+- Focus on achievements, not responsibilities
+- Use digits instead of spelling out numbers
+- NEVER use a technology before its introduction year (see TECHNOLOGY TIMELINE below)
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("extended", domain)}
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+The first 3 bullets of each role are the ONLY ones most hiring managers will read.
+- Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
+- Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
+- Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
+- Bullet 3: a strong technical achievement with clear metrics
+- Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+With 14-20 bullets, mix these types:
+- 4-6 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 6-8 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 3-5 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
+
+PROFESSIONAL SUMMARY REQUIREMENTS:
+- Write 6-9 sentences covering experience breadth, key technologies, cloud platforms, methodologies, and domain expertise
+- Pack with keywords: programming languages, frameworks, cloud services, databases, and methodologies from the JD
+- Include years of experience, scale of systems worked on, and industry context
+
+PROJECTS SECTION:
+- 2-4 projects that demonstrate JD-relevant depth (open source, internal platforms, migrations, side initiatives)
+- Each project: a clear name, the key technologies, and 1-3 bullets describing what it did and why it mattered
+- Projects add page volume legitimately — they are real work, not padding. Apply the same anti-slop rules.
+
+COMPANY & DOMAIN CONTEXT:
+- When specific companies are provided, use your knowledge of that company to generate
+  domain-appropriate bullet points. This means:
+  - Use industry-specific terminology (e.g., "clinical trials" for pharma, "capital allocation" for fintech)
+  - Reference domain-specific tools and platforms (e.g., Veeva CRM for pharma, Basel III for banking)
+  - Create realistic project scenarios that someone at that company would actually work on
+  - The JD's requirements determine WHICH aspects of the domain to emphasize
+- When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
+  generate domain-appropriate content without referencing a specific employer
+- If the user provides a description of what they did at a company, use it to anchor the bullet points
+  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
+}
+
 function buildUserMessage(jd, customer, context, companies, domain) {
   const c = resolveDomain(domain);
   let message = `Generate a resume for this job description:\n\n${jd}`;
@@ -657,6 +772,115 @@ ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.
 CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
 }
 
+function buildOptimizeSystemPromptExtended(domain, includeCertifications) {
+  const c = resolveDomain(domain);
+  const cert = certSchema(c, includeCertifications);
+  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized, design-forward for a specific job description using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 3 pages and UP TO 4 pages where EVERY bullet scores 5+ out of 7 on quality. Never produce a one-pager.
+
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanations, no extra text
+2. Use the exact JSON schema provided below
+3. PRESERVE the candidate's real companies, job titles, dates, and locations EXACTLY as they appear
+4. Do NOT invent new companies, roles, or change employment dates
+5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
+6. EXTRACT education details (schools, degrees, dates, locations) from the resume
+7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
+8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
+9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
+10. OPTIMIZE the professional summary for the target role — make it 6-9 sentences packed with keywords
+11. REORDER technical skills to prioritize what the JD asks for
+12. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
+13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT. See TECHNOLOGY TIMELINE below.
+
+Use these SHORT KEYS in your JSON response (saves tokens):
+{
+  "jd": {
+    "rt": "role title",
+    "ind": "industry",
+    "cp": "aws|azure|gcp",
+    "kt": ["tech1", "tech2"],
+    "rs": ["skill1", "skill2"]
+  },
+  "ct": {
+    "n": "extracted from resume",
+    "em": "extracted from resume",
+    "ph": "extracted from resume",
+    "li": "extracted from resume or empty string",
+    "gh": "extracted from resume or empty string"
+  },
+  "edu": [
+    {
+      "sc": "University Name",
+      "dg": "Degree Name",
+      "loc": "City, State",
+      "sd": "MMM YYYY",
+      "ed": "MMM YYYY"
+    }
+  ],
+  "ps": "6-9 sentence summary packed with technologies, methodologies, and domain keywords",
+  "ts": {
+    "lang": "comma-separated, prioritized by JD relevance",
+    "fw": "comma-separated",
+    "cloud": "comma-separated",
+    "db": "comma-separated",
+    "tools": "comma-separated"
+  },
+  "exp": [
+    {
+      "co": "EXACT company name from resume",
+      "ti": "EXACT title from resume",
+      "loc": "City, State from resume",
+      "sd": "MMM YYYY from resume",
+      "ed": "MMM YYYY from resume",
+      "b": [
+        "Rewritten XYZ bullet with technology name AND metric scoring 5+/7",
+        "Another rewritten bullet with specific framework AND percentage"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project name (ONLY if present in the original resume)",
+      "tech": "comma-separated key technologies",
+      "b": ["What it did and why it mattered, with JD keywords woven in"]
+    }
+  ]${cert.schemaLine}
+}
+${cert.instruction}${domainContextBlock(c)}
+OPTIMIZATION RULES:
+- Keep the SAME number of jobs and same career structure
+- Each role should have 14-20 detailed bullets
+- If original has fewer than 14 bullets per role, EXPAND with JD-relevant achievements grounded in the role's real scope (do NOT fabricate employers, titles, or dates)
+- The resume MUST reach at least 3 pages and may extend to 4 — never shorter
+- Only include a "projects" array if the original resume describes projects; rewrite them with JD keywords. Do NOT invent projects.
+- Do NOT end bullet points with periods
+- Keep bullets under 250 characters
+- Prioritize technologies mentioned in the JD
+- For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
+- If contact fields are not found in the resume, use empty strings
+- PROFESSIONAL SUMMARY must be 6-9 sentences packed with keywords from the JD
+${buildKeywordPlacementSection(domain)}
+${buildAntiSlopPromptSection("optimize-extended", domain)}
+BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
+Place the strongest rewritten bullets FIRST in each role.
+- Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
+- Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
+- Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
+- Bullet 3: a strong technical achievement with clear metrics
+- Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
+
+BUSINESS VALUE MIX (per role):
+With 14-20 bullets, mix these types:
+- 4-6 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 6-8 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 3-5 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
+
+TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+
+CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
+}
+
 function buildOptimizeUserMessage(resume, jd, context) {
   let message = `Here is the candidate's current resume:\n\n${resume}`;
   message += `\n\n---\n\nHere is the target job description:\n\n${jd}`;
@@ -783,9 +1007,11 @@ function buildAntiSlopPromptSection(mode, domain) {
 module.exports = {
   buildSystemPrompt,
   buildSystemPromptXL,
+  buildSystemPromptExtended,
   buildUserMessage,
   buildOptimizeSystemPrompt,
   buildOptimizeSystemPromptXL,
+  buildOptimizeSystemPromptExtended,
   buildOptimizeUserMessage,
   buildAntiSlopPromptSection,
   scoreResume,

@@ -124,6 +124,20 @@ const FORMAT_XL = {
   max_pages: 3,
 };
 
+// --- Extended mode formatting (3-4 page, design-forward resume) ---
+const FORMAT_EXTENDED = {
+  page: {
+    margins: {
+      top: 540,       // 0.375 inch
+      bottom: 540,
+      left: 720,      // 0.5 inch
+      right: 720,
+    },
+  },
+  bullets_per_role: { min: 14, max: 20 },
+  max_pages: 4,
+};
+
 // --- ATS section headers (recognized by all major ATS) ---
 const ATS_HEADERS = {
   summary: "Summary",
@@ -495,6 +509,8 @@ Never make every bullet sound triumphant. Real work is messy.`,
     xl:            { max: 5, per: "10-15",  description: "At most 5 of 10-15 bullets per role should have hard metrics" },
     optimize:      { max: 4, per: "6-8",    description: "At most 4 of 6-8 bullets per role should have hard metrics" },
     "optimize-xl": { max: 7, per: "10-15",  description: "At most 5-7 of 10-15 bullets per role should have hard metrics" },
+    extended:            { max: 9,  per: "14-20", description: "At most 7-9 of 14-20 bullets per role should have hard metrics" },
+    "optimize-extended": { max: 9,  per: "14-20", description: "At most 7-9 of 14-20 bullets per role should have hard metrics" },
   },
 };
 
@@ -735,6 +751,7 @@ module.exports = {
   TIMELINE,
   FORMAT,
   FORMAT_XL,
+  FORMAT_EXTENDED,
   ATS_HEADERS,
   XYZ_PATTERNS,
   ACTION_VERBS,

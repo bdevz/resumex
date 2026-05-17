@@ -55,14 +55,23 @@ describe("ANTI_SLOP config", () => {
     assert.ok(config.ANTI_SLOP.tone.length > 0);
   });
 
-  it("has max_metric_ratio for all four modes", () => {
+  it("has max_metric_ratio for all six modes", () => {
     const ratio = config.ANTI_SLOP.max_metric_ratio;
-    for (const mode of ["standard", "xl", "optimize", "optimize-xl"]) {
+    for (const mode of ["standard", "xl", "optimize", "optimize-xl", "extended", "optimize-extended"]) {
       assert.ok(ratio[mode], `missing ratio for mode "${mode}"`);
       assert.equal(typeof ratio[mode].max, "number");
       assert.equal(typeof ratio[mode].per, "string");
       assert.equal(typeof ratio[mode].description, "string");
     }
+  });
+
+  it("extended metric cap scales with the larger bullet count (anti-slop coexists)", () => {
+    const ratio = config.ANTI_SLOP.max_metric_ratio;
+    // More bullets ⇒ a higher absolute cap, but still a minority-with-metrics
+    // bound so keyword saturation and human voice keep coexisting.
+    assert.ok(ratio.extended.max > ratio.xl.max);
+    assert.ok(ratio["optimize-extended"].max >= ratio["optimize-xl"].max);
+    assert.match(ratio.extended.per, /14-20/);
   });
 
   it("does not ban words that exist in ACTION_VERBS", () => {
@@ -258,6 +267,31 @@ describe("buildOptimizeSystemPrompt() anti-slop integration", () => {
 
   it("still contains OPTIMIZATION RULES", () => {
     assert.ok(prompt.includes("OPTIMIZATION RULES:"));
+  });
+});
+
+describe("Extended (3-4 page) prompt builders", () => {
+  it("buildSystemPromptExtended is exported and targets 3-4 pages with projects", () => {
+    assert.equal(typeof prompts.buildSystemPromptExtended, "function");
+    const p = prompts.buildSystemPromptExtended();
+    assert.ok(p.includes("MINIMUM 3 pages"));
+    assert.ok(p.includes("14-20"));
+    assert.ok(p.includes('"projects"'));
+    assert.ok(p.includes("WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:"));
+    assert.ok(p.includes("KEYWORD PLACEMENT — 100% MATCH IS NON-NEGOTIABLE:"));
+  });
+
+  it("buildOptimizeSystemPromptExtended preserves real history, no invented projects", () => {
+    assert.equal(typeof prompts.buildOptimizeSystemPromptExtended, "function");
+    const p = prompts.buildOptimizeSystemPromptExtended();
+    assert.ok(p.includes("PRESERVE the candidate's real companies"));
+    assert.ok(p.includes("Do NOT invent projects"));
+    assert.ok(p.includes("14-20"));
+  });
+
+  it("extended anti-slop section uses the extended metric ratio", () => {
+    const ext = prompts.buildAntiSlopPromptSection("extended");
+    assert.ok(ext.includes("14-20"));
   });
 });
 

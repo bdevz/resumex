@@ -128,7 +128,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --zip-file "fileb://lambda.zip" \
   --timeout 300 \
   --memory-size 512 \
-  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+  --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY}" \
   --region "$REGION" \
   --query 'FunctionArn' --output text 2>/dev/null) || {
   echo "  Function exists, updating..."
@@ -145,7 +145,7 @@ LAMBDA_ARN=$(aws lambda create-function \
     --timeout 300 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
-    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE}" \
+    --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY}" \
     --region "$REGION" --output text --query 'FunctionArn' > /dev/null
 
   LAMBDA_ARN=$(aws lambda get-function \
@@ -261,12 +261,8 @@ sed "s|%%API_URL%%|${API_URL}|g" frontend/index.html > /tmp/index.html
 aws s3 cp /tmp/index.html "s3://$S3_BUCKET/index.html" \
   --content-type "text/html" --cache-control "max-age=300" --quiet
 
-# Upload template preview images
-if [ -d "frontend/templates" ]; then
-  aws s3 sync frontend/templates/ "s3://$S3_BUCKET/templates/" \
-    --content-type "image/jpeg" --cache-control "max-age=86400" --quiet
-  echo "  Uploaded $(ls frontend/templates/*.jpg 2>/dev/null | wc -l | tr -d ' ') template previews"
-fi
+# (Template preview JPGs removed — the design composer renders a live
+#  client-side CSS preview, so there are no static preview assets to upload.)
 
 S3_URL="http://$S3_BUCKET.s3-website-$REGION.amazonaws.com"
 echo "  S3 Website: $S3_URL"
