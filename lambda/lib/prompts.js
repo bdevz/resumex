@@ -221,7 +221,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or 
 function buildSystemPromptExtended(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume generator that creates keyword-heavy, ATS-optimized, design-forward resumes using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 3 pages and UP TO 4 pages where EVERY bullet scores 5+ out of 7 on quality. This is NOT a one-pager — depth and breadth are expected.
+  return `You are a resume generator that creates keyword-heavy, ATS-optimized, design-forward resumes using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages where EVERY bullet scores 5+ out of 7 on quality. This is NOT a one-pager — depth and breadth are expected.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -241,7 +241,7 @@ Use these SHORT KEYS in your JSON response (saves tokens):
     "kt": ["tech1", "tech2"],
     "rs": ["skill1", "skill2"]
   },
-  "ps": "6-9 sentence summary packed with technologies, methodologies, and domain keywords from the JD",
+  "ps": "7-10 sentence summary packed with technologies, methodologies, and domain keywords from the JD",
   "ts": {
     "lang": "comma-separated list",
     "fw": "comma-separated list",
@@ -276,8 +276,8 @@ WORK HISTORY GUIDELINES:
 - Previous roles: 18-28 months each
 - Include 1-2 IT services companies (${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
 - Use competitor companies from the target industry
-- Each role should have 14-20 detailed bullets
-- The resume MUST span at least 3 pages and may extend to 4 pages — never shorter
+- Each role should have 18-26 detailed bullets
+- The resume MUST span at least 4 pages and may extend to 5 pages — never shorter
 - Include a "projects" array with 2-4 substantial projects/initiatives to add legitimate depth (NOT filler — real, JD-relevant work)
 - Timeline must be realistic (no gaps, no overlaps)
 
@@ -300,13 +300,13 @@ The first 3 bullets of each role are the ONLY ones most hiring managers will rea
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
-With 14-20 bullets, mix these types:
-- 4-6 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
-- 6-8 bullets: Technical achievement — performance gains, architecture, system design, migrations
-- 3-5 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
+With 18-26 bullets, mix these types:
+- 6-9 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 8-12 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 4-6 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 PROFESSIONAL SUMMARY REQUIREMENTS:
-- Write 6-9 sentences covering experience breadth, key technologies, cloud platforms, methodologies, and domain expertise
+- Write 7-10 sentences covering experience breadth, key technologies, cloud platforms, methodologies, and domain expertise
 - Pack with keywords: programming languages, frameworks, cloud services, databases, and methodologies from the JD
 - Include years of experience, scale of systems worked on, and industry context
 
@@ -440,10 +440,9 @@ function scoreBullet(bullet, c) {
     .flat()
     .some(verb => bullet.toLowerCase().startsWith(verb.toLowerCase()));
 
-  if (isWeakVerb) {
-    score -= 1;
-    breakdown.push("Weak action verb (penalty)");
-  } else if (startsWithActionVerb) {
+  // Weak lead verbs (Wrote, Built, Set up…) are normal in engineering resumes
+  // and no longer penalized — only a strong verb earns the bonus.
+  if (!isWeakVerb && startsWithActionVerb) {
     score += c.QUALITY_SCORING.verb_check_points;
     breakdown.push("Strong action verb");
   }
@@ -775,7 +774,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts before the 
 function buildOptimizeSystemPromptExtended(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized, design-forward for a specific job description using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 3 pages and UP TO 4 pages where EVERY bullet scores 5+ out of 7 on quality. Never produce a one-pager.
+  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized, design-forward for a specific job description using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages where EVERY bullet scores 5+ out of 7 on quality. Never produce a one-pager.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -787,7 +786,7 @@ CRITICAL RULES:
 7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
 8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
-10. OPTIMIZE the professional summary for the target role — make it 6-9 sentences packed with keywords
+10. OPTIMIZE the professional summary for the target role — make it 7-10 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
 12. Use strong, direct action verbs: ${c.PROMPT_VERBS.strong_short}. NEVER use weak/passive verbs (${c.PROMPT_VERBS.weak})
 13. NEVER mention a technology in a role if the role's dates are BEFORE the technology existed. This is a HARD CONSTRAINT. See TECHNOLOGY TIMELINE below.
@@ -817,7 +816,7 @@ Use these SHORT KEYS in your JSON response (saves tokens):
       "ed": "MMM YYYY"
     }
   ],
-  "ps": "6-9 sentence summary packed with technologies, methodologies, and domain keywords",
+  "ps": "7-10 sentence summary packed with technologies, methodologies, and domain keywords",
   "ts": {
     "lang": "comma-separated, prioritized by JD relevance",
     "fw": "comma-separated",
@@ -849,16 +848,16 @@ Use these SHORT KEYS in your JSON response (saves tokens):
 ${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
-- Each role should have 14-20 detailed bullets
+- Each role should have 18-26 detailed bullets
 - If original has fewer than 14 bullets per role, EXPAND with JD-relevant achievements grounded in the role's real scope (do NOT fabricate employers, titles, or dates)
-- The resume MUST reach at least 3 pages and may extend to 4 — never shorter
+- The resume MUST reach at least 4 pages and may extend to 5 — never shorter
 - Only include a "projects" array if the original resume describes projects; rewrite them with JD keywords. Do NOT invent projects.
 - Do NOT end bullet points with periods
 - Keep bullets under 250 characters
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
-- PROFESSIONAL SUMMARY must be 6-9 sentences packed with keywords from the JD
+- PROFESSIONAL SUMMARY must be 7-10 sentences packed with keywords from the JD
 ${buildKeywordPlacementSection(domain)}
 ${buildAntiSlopPromptSection("optimize-extended", domain)}
 BULLET ORDERING (CRITICAL FOR SKIMMABILITY):
@@ -870,10 +869,10 @@ Place the strongest rewritten bullets FIRST in each role.
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
-With 14-20 bullets, mix these types:
-- 4-6 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
-- 6-8 bullets: Technical achievement — performance gains, architecture, system design, migrations
-- 3-5 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
+With 18-26 bullets, mix these types:
+- 6-9 bullets: Business impact — scale served, revenue influenced, compliance achieved, customer outcomes
+- 8-12 bullets: Technical achievement — performance gains, architecture, system design, migrations
+- 4-6 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}

@@ -71,7 +71,7 @@ describe("ANTI_SLOP config", () => {
     // bound so keyword saturation and human voice keep coexisting.
     assert.ok(ratio.extended.max > ratio.xl.max);
     assert.ok(ratio["optimize-extended"].max >= ratio["optimize-xl"].max);
-    assert.match(ratio.extended.per, /14-20/);
+    assert.match(ratio.extended.per, /18-26/);
   });
 
   it("does not ban words that exist in ACTION_VERBS", () => {
@@ -270,12 +270,12 @@ describe("buildOptimizeSystemPrompt() anti-slop integration", () => {
   });
 });
 
-describe("Extended (3-4 page) prompt builders", () => {
-  it("buildSystemPromptExtended is exported and targets 3-4 pages with projects", () => {
+describe("Extended (4-5 page) prompt builders", () => {
+  it("buildSystemPromptExtended is exported and targets 4-5 pages with projects", () => {
     assert.equal(typeof prompts.buildSystemPromptExtended, "function");
     const p = prompts.buildSystemPromptExtended();
-    assert.ok(p.includes("MINIMUM 3 pages"));
-    assert.ok(p.includes("14-20"));
+    assert.ok(p.includes("MINIMUM 4 pages"));
+    assert.ok(p.includes("18-26"));
     assert.ok(p.includes('"projects"'));
     assert.ok(p.includes("WRITING STYLE — SOUND HUMAN, NOT AI-GENERATED:"));
     assert.ok(p.includes("KEYWORD PLACEMENT — 100% MATCH IS NON-NEGOTIABLE:"));
@@ -286,12 +286,12 @@ describe("Extended (3-4 page) prompt builders", () => {
     const p = prompts.buildOptimizeSystemPromptExtended();
     assert.ok(p.includes("PRESERVE the candidate's real companies"));
     assert.ok(p.includes("Do NOT invent projects"));
-    assert.ok(p.includes("14-20"));
+    assert.ok(p.includes("18-26"));
   });
 
   it("extended anti-slop section uses the extended metric ratio", () => {
     const ext = prompts.buildAntiSlopPromptSection("extended");
-    assert.ok(ext.includes("14-20"));
+    assert.ok(ext.includes("18-26"));
   });
 });
 

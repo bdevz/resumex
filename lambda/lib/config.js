@@ -124,7 +124,7 @@ const FORMAT_XL = {
   max_pages: 3,
 };
 
-// --- Extended mode formatting (3-4 page, design-forward resume) ---
+// --- Extended mode formatting (4-5 page, design-forward resume) ---
 const FORMAT_EXTENDED = {
   page: {
     margins: {
@@ -134,8 +134,8 @@ const FORMAT_EXTENDED = {
       right: 720,
     },
   },
-  bullets_per_role: { min: 14, max: 20 },
-  max_pages: 4,
+  bullets_per_role: { min: 18, max: 26 },
+  max_pages: 5,
 };
 
 // --- ATS section headers (recognized by all major ATS) ---
@@ -209,9 +209,14 @@ const QUALITY_SCORING = {
     { pattern: /from\s+\d.*to\s+\d/i, points: 2, label: "baseline comparison" },
     { pattern: /team of \d+|(\d+)\s*(engineers?|developers?|members?)/i, points: 1, label: "team size" },
     { pattern: /\b(?:Java|Python|Go|Rust|SQL|JavaScript|TypeScript|C\+\+|Ruby|Scala|Kotlin|Swift|PHP|Bash|Shell|Apex|SOQL|SOSL|HTML|CSS|XML|JSON|C#|R|Perl|Dart|Lua)\b/i, points: 1, label: "programming language" },
-    { pattern: /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Kafka|Redis|Spring|React|Angular|Vue|Node\.?js|Next\.?js|Terraform|Jenkins|PostgreSQL|MySQL|MongoDB|DynamoDB|Cassandra|Lambda|S3|EC2|ECS|EKS|SQS|SNS|CloudFormation|CloudWatch|Redshift|ElastiCache|Datadog|Splunk|GraphQL|REST|gRPC|RabbitMQ|Elasticsearch|Nginx|GitHub Actions|CircleCI|ArgoCD|Helm|Prometheus|Grafana|HikariCP|Hibernate|JUnit|Mockito|FastAPI|Django|Flask|Express|Salesforce|Lightning|LWC|Visualforce|Copado|MuleSoft|Informatica|ServiceNow|SAP|Jira|Confluence|SFDX|Heroku|Aura|Data Loader|Postman|SonarQube|Snowflake|Databricks|Tableau|Power BI|Looker|Airflow|dbt|Fivetran|Segment|Twilio|Stripe|Okta|Auth0|Vercel|Netlify|Firebase|Supabase)\b/i, points: 1, label: "technology name" },
+    { pattern: /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Kafka|Redis|Spring|React|Angular|Vue|Node\.?js|Next\.?js|Terraform|Jenkins|PostgreSQL|MySQL|MongoDB|DynamoDB|Cassandra|Lambda|S3|EC2|ECS|EKS|SQS|SNS|CloudFormation|CloudWatch|Redshift|ElastiCache|Datadog|Splunk|GraphQL|REST|gRPC|RabbitMQ|Elasticsearch|Nginx|GitHub Actions|CircleCI|ArgoCD|Helm|Prometheus|Grafana|HikariCP|Hibernate|JUnit|Mockito|FastAPI|Django|Flask|Express|Salesforce|Lightning|LWC|Visualforce|Copado|MuleSoft|Informatica|ServiceNow|SAP|Jira|Confluence|SFDX|Heroku|Aura|Data Loader|Postman|SonarQube|Snowflake|Databricks|Tableau|Power BI|Looker|Airflow|dbt|Fivetran|Segment|Twilio|Stripe|Okta|Auth0|Vercel|Netlify|Firebase|Supabase|OpenAI|Anthropic|Claude|GPT-?[45]o?|LangChain|LangGraph|LlamaIndex|Llama|Pydantic|Bedrock|Vertex ?AI|Hugging ?Face|PyTorch|TensorFlow|Keras|spaCy|scikit-?learn|XGBoost|RAG|LLMs?|OCR|OpenTelemetry|vLLM|Ollama|Pinecone|Weaviate|Milvus|FAISS|Chroma|pgvector|embeddings?|fine-?tun\w+|vector (?:database|store|DB)|agentic|multi-?agent|JSON Schema)\b/i, points: 1, label: "technology name" },
+    // Outcome / measurable impact phrased without needing a % or $ amount —
+    // these are real achievements and the anti-slop system asks for them.
+    { pattern: /\b(?:reduced|cut|improved|increased|decreased|eliminated|removed|replaced|consolidated|accelerated|prevented|recovered|shipped|launched|delivered|migrated|rewrote|rebuilt|automated|streamlined|deprecated|unblocked|stabilized|halved|doubled|tripled)\b/i, points: 2, label: "outcome/impact" },
+    // Names a concrete system / artifact the candidate actually built or owned.
+    { pattern: /\b(?:pipeline|service|endpoint|schema|extractor|classifier|fallback|runbook|rotation|harness|scaffolding|SDK|dataset|gateway|cache|index|migration|framework|parser|validator|connector|webhook|scheduler|orchestrat\w+|retriev\w+|eval(?:uation)?s?|architecture|workflow|integration|microservices?|API)\b/i, points: 1, label: "concrete system/artifact" },
     // Business value (capped at business_group_cap total)
-    { pattern: /\b\d[\d,.]*[KkMmBb]?\+?\s*(?:\w+\s+)?(?:users?|customers?|residents?|clients?|employees?|patients?|subscribers?|accounts?|merchants?|transactions?|requests?|members?|records?|orders?|vehicles?|devices?|endpoints?|applications?|services?|departments?|stores?|locations?|regions?|citizens?|constituents?|beneficiaries?|agencies?|organizations?|tenants?|partners?|vendors?|sites?|markets?|countries?|teams?|projects?)\b/i, points: 2, label: "scale/reach metric", group: "business" },
+    { pattern: /\b\d[\d,.]*[KkMmBb]?\+?\s*(?:\w+\s+)?(?:users?|customers?|residents?|clients?|employees?|patients?|subscribers?|accounts?|merchants?|transactions?|requests?|members?|records?|orders?|vehicles?|devices?|endpoints?|applications?|services?|departments?|stores?|locations?|regions?|citizens?|constituents?|beneficiaries?|agencies?|organizations?|tenants?|partners?|vendors?|sites?|markets?|countries?|teams?|projects?|images?|documents?|pages?|tokens?|spans?|datasets?|models?|parameters?|calls?|queries|reviews?|claims?|cases?|events?|messages?|rows?)\b/i, points: 2, label: "scale/reach metric", group: "business" },
     { pattern: /\b(?:compliance|regulatory|SOC\s*2|FedRAMP|HIPAA|PCI[\s-]?DSS|GDPR|SOX|ISO\s*27001|CCPA|CJIS|FISMA|NIST|ADA)\b/i, points: 1, label: "compliance/regulatory", group: "business" },
     { pattern: /\b(?:stakeholder|executive|C-suite|CTO|CFO|CEO|CIO|CISO|VP|director|cross[\s-]?functional|cross[\s-]?team)\b/i, points: 1, label: "stakeholder engagement", group: "business" },
     { pattern: /\b(?:revenue|adoption|retention|satisfaction|NPS|CSAT|SLA|uptime|availability|reliability|churn|conversion|engagement)\b/i, points: 1, label: "business outcome", group: "business" },
@@ -232,8 +237,9 @@ const QUALITY_SCORING = {
     { pattern: /,\s+(?:enabling|ensuring|improving|reducing|establishing|standardizing|accelerating|driving|achieving|enhancing|facilitating|streamlining|optimizing|maximizing|empowering|fostering)\b.*$/i, points: -2, label: "trailing -ing clause" },
     // Adjective triplet: "scalable, resilient, and performant"
     { pattern: /\w+,\s+\w+,\s+and\s+\w+\s+(?:system|platform|architecture|solution|framework|infrastructure|pipeline|service)/i, points: -2, label: "adjective triplet" },
-    // Metric stacking: 3+ numbers in one bullet
-    { pattern: /\d.*\d.*\d.*\d/i, points: -1, label: "metric stacking (4+ numbers)" },
+    // Metric stacking: 5+ separate numbers crammed in one bullet. A single
+    // "from X to Y" comparison (two numbers) is good, not slop.
+    { pattern: /(?:\b\d[\d.,]*%?\b\D+){4,}\b\d[\d.,]*%?\b/i, points: -1, label: "metric stacking (5+ numbers)" },
     // Generic filler phrases
     { pattern: /\b(?:proven track record|deep expertise|track record of|passionate about|with a strong focus on|known for)\b/i, points: -2, label: "generic filler phrase" },
   ],
@@ -246,6 +252,9 @@ const QUALITY_SCORING = {
     { pattern: /\b(?:the \w+ team|on-call|oncall|our team|my team|the team)\b/i, points: 1, label: "team context (human voice)" },
     // Short, punchy bullet (under 120 chars) with substance
     { pattern: /^.{40,120}$/i, points: 1, label: "concise bullet" },
+    // Well-structured bullet (real sentence, sensible length) — a small floor
+    // so substantive no-metric achievement bullets aren't graded as failures.
+    { pattern: /^.{45,260}$/s, points: 2, label: "well-structured bullet" },
   ],
 
   // --- Role-level penalties (applied in scoreResume, not scoreBullet) ---
@@ -256,9 +265,9 @@ const QUALITY_SCORING = {
   },
 
   thresholds: {
-    excellent: 7,
-    good: 5,
-    needs_improvement: 3,
+    excellent: 6,
+    good: 4,
+    needs_improvement: 2,
   },
 };
 
@@ -509,8 +518,8 @@ Never make every bullet sound triumphant. Real work is messy.`,
     xl:            { max: 5, per: "10-15",  description: "At most 5 of 10-15 bullets per role should have hard metrics" },
     optimize:      { max: 4, per: "6-8",    description: "At most 4 of 6-8 bullets per role should have hard metrics" },
     "optimize-xl": { max: 7, per: "10-15",  description: "At most 5-7 of 10-15 bullets per role should have hard metrics" },
-    extended:            { max: 9,  per: "14-20", description: "At most 7-9 of 14-20 bullets per role should have hard metrics" },
-    "optimize-extended": { max: 9,  per: "14-20", description: "At most 7-9 of 14-20 bullets per role should have hard metrics" },
+    extended:            { max: 12, per: "18-26", description: "At most 9-12 of 18-26 bullets per role should have hard metrics" },
+    "optimize-extended": { max: 12, per: "18-26", description: "At most 9-12 of 18-26 bullets per role should have hard metrics" },
   },
 };
 

@@ -121,7 +121,7 @@ describe("single-column is the ATS-safe default", () => {
     }
   });
 
-  it("composed default targets a 3-4 page (extended) design", () => {
+  it("composed default targets a 4-5 page (extended) design", () => {
     assert.equal(composeDesign("x").density, "extended");
   });
 
