@@ -28,6 +28,7 @@ npm run build
 You'll need to set these during deployment:
 - `OPENROUTER_API_KEY`: Your OpenRouter API key (sk-or-...)
 - `SHARED_PASSPHRASE`: Team passphrase for accessing the app
+- `ADMIN_PASSPHRASE`: Separate passphrase that unlocks the Admin usage-review view
 
 ### 3. Deploy
 
