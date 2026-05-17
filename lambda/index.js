@@ -11,7 +11,7 @@
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
-const { buildSystemPrompt, buildSystemPromptXL, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { buildSystemPrompt, buildSystemPromptXL, buildSystemPromptExtended, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeSystemPromptExtended, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
 const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
@@ -295,22 +295,38 @@ function getHeaders(event) {
   return event.headers || {};
 }
 
+// Resolve the length tier. `length` ("standard"|"xl"|"extended") wins; the
+// legacy `xlMode` boolean is kept as an alias for "xl".
+function resolveLength(body) {
+  if (body.length === "extended") return "extended";
+  if (body.length === "xl" || body.xlMode) return "xl";
+  if (body.length === "standard") return "standard";
+  return body.xlMode ? "xl" : "standard";
+}
+
+function maxTokensFor(len) {
+  return len === "standard" ? 8192 : 16384;
+}
+
 // ── Route: POST /analyze ──
 
 async function handleAnalyze(body) {
-  const { jd, customer, context, model: modelInput, xlMode, companies, domain, includeCertifications } = body;
+  const { jd, customer, context, model: modelInput, companies, domain, includeCertifications } = body;
 
   if (!jd || jd.trim().length < 50) {
     return response(400, { error: "Job description too short (need at least 50 characters)" });
   }
 
   const dom = domain || "software";
-  const systemPrompt = xlMode
-    ? buildSystemPromptXL(dom, includeCertifications)
-    : buildSystemPrompt(dom, includeCertifications);
+  const len = resolveLength(body);
+  const systemPrompt = len === "extended"
+    ? buildSystemPromptExtended(dom, includeCertifications)
+    : len === "xl"
+      ? buildSystemPromptXL(dom, includeCertifications)
+      : buildSystemPrompt(dom, includeCertifications);
   const userMessage = buildUserMessage(jd, customer, context, companies, dom);
 
-  const r = await callLLM(modelInput, systemPrompt, userMessage, xlMode ? 16384 : 8192);
+  const r = await callLLM(modelInput, systemPrompt, userMessage, maxTokensFor(len));
   if (!r.ok) {
     return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
@@ -341,7 +357,7 @@ async function handleAnalyze(body) {
 // ── Route: POST /optimize ──
 
 async function handleOptimize(body) {
-  const { resume, jd, context, model: modelInput, xlMode, domain, includeCertifications } = body;
+  const { resume, jd, context, model: modelInput, domain, includeCertifications } = body;
 
   if (!resume || resume.trim().length < 100) {
     return response(400, { error: "Resume too short (need at least 100 characters)" });
@@ -352,12 +368,15 @@ async function handleOptimize(body) {
   }
 
   const dom = domain || "software";
-  const systemPrompt = xlMode
-    ? buildOptimizeSystemPromptXL(dom, includeCertifications)
-    : buildOptimizeSystemPrompt(dom, includeCertifications);
+  const len = resolveLength(body);
+  const systemPrompt = len === "extended"
+    ? buildOptimizeSystemPromptExtended(dom, includeCertifications)
+    : len === "xl"
+      ? buildOptimizeSystemPromptXL(dom, includeCertifications)
+      : buildOptimizeSystemPrompt(dom, includeCertifications);
   const userMessage = buildOptimizeUserMessage(resume, jd, context);
 
-  const r = await callLLM(modelInput, systemPrompt, userMessage, xlMode ? 16384 : 8192);
+  const r = await callLLM(modelInput, systemPrompt, userMessage, maxTokensFor(len));
   if (!r.ok) {
     return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
@@ -389,7 +408,7 @@ async function handleOptimize(body) {
 // ── Route: POST /build ──
 
 async function handleBuild(body) {
-  const { resumeData, template, includeEducation, xlMode } = body;
+  const { resumeData, template, design, includeEducation, xlMode, length } = body;
 
   if (!resumeData || !resumeData.experience) {
     return response(400, { error: "Missing resumeData with experience array" });
@@ -397,8 +416,10 @@ async function handleBuild(body) {
 
   const buffer = await buildResume(resumeData, null, {
     template: template || "classic",
+    design: design || undefined,
     includeEducation: includeEducation !== false,
     xlMode: !!xlMode,
+    length: length || (xlMode ? "xl" : undefined),
   });
   return binaryResponse(buffer, "Resume.docx");
 }
@@ -464,12 +485,17 @@ if (typeof awslambda !== "undefined") {
     let systemPrompt, userMessage, modelAlias, mode;
 
     let dom = "software";
+    const len = resolveLength(body);
     if (path.includes("/optimize") && method === "POST") {
       const { resume, jd, context, model: modelInput, domain, includeCertifications } = body;
       if (!resume || resume.trim().length < 100) return streamError(400, "Resume too short");
       if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
       dom = domain || "software";
-      systemPrompt = buildOptimizeSystemPrompt(dom, includeCertifications);
+      systemPrompt = len === "extended"
+        ? buildOptimizeSystemPromptExtended(dom, includeCertifications)
+        : len === "xl"
+          ? buildOptimizeSystemPromptXL(dom, includeCertifications)
+          : buildOptimizeSystemPrompt(dom, includeCertifications);
       userMessage = buildOptimizeUserMessage(resume, jd, context);
       modelAlias = modelInput;
       mode = "optimize";
@@ -477,13 +503,18 @@ if (typeof awslambda !== "undefined") {
       const { jd, customer, context, model: modelInput, companies, domain, includeCertifications } = body;
       if (!jd || jd.trim().length < 50) return streamError(400, "Job description too short");
       dom = domain || "software";
-      systemPrompt = buildSystemPrompt(dom, includeCertifications);
+      systemPrompt = len === "extended"
+        ? buildSystemPromptExtended(dom, includeCertifications)
+        : len === "xl"
+          ? buildSystemPromptXL(dom, includeCertifications)
+          : buildSystemPrompt(dom, includeCertifications);
       userMessage = buildUserMessage(jd, customer, context, companies, dom);
       modelAlias = modelInput;
       mode = "generate";
     } else {
       return streamError(404, "Not found");
     }
+    const streamMaxTokens = maxTokensFor(len);
 
     // Set up SSE response
     responseStream = awslambda.HttpResponseStream.from(responseStream, {
@@ -513,7 +544,7 @@ if (typeof awslambda !== "undefined") {
           },
           body: JSON.stringify({
             model: m.id,
-            max_completion_tokens: 4096,
+            max_completion_tokens: streamMaxTokens,
             response_format: { type: "json_object" },
             stream: true,
             messages: [
@@ -533,7 +564,7 @@ if (typeof awslambda !== "undefined") {
           },
           body: JSON.stringify({
             model: m.id,
-            max_tokens: 4096,
+            max_tokens: streamMaxTokens,
             stream: true,
             system: systemPrompt,
             messages: [
