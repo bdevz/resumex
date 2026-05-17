@@ -25,6 +25,7 @@ backend:
     NODE_ENV: production
     # ANTHROPIC_API_KEY: "your-anthropic-api-key-here"  # Set this during deployment
     # SHARED_PASSPHRASE: "your-team-passphrase-here"      # Set this during deployment
+    # ADMIN_PASSPHRASE: "your-admin-passphrase-here"      # Set this during deployment — gates the Admin usage-review view
 
 deployment:
   stack_name: resumex-stack

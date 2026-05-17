@@ -25,6 +25,10 @@ if [ -z "$SHARED_PASSPHRASE" ]; then
   read -p "Team Passphrase: " SHARED_PASSPHRASE
 fi
 
+if [ -z "$ADMIN_PASSPHRASE" ]; then
+  read -p "Admin Passphrase (usage review): " ADMIN_PASSPHRASE
+fi
+
 echo ""
 echo "🚀 Updating Lambda environment variables..."
 
@@ -34,7 +38,8 @@ aws lambda update-function-configuration \
   --environment "Variables={
     NODE_ENV=production,
     ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,
-    SHARED_PASSPHRASE=$SHARED_PASSPHRASE
+    SHARED_PASSPHRASE=$SHARED_PASSPHRASE,
+    ADMIN_PASSPHRASE=$ADMIN_PASSPHRASE
   }" \
   --output table \
   --query 'Environment.Variables'
