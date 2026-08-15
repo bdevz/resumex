@@ -151,13 +151,23 @@ function checkAdmin(headers) {
 const DEFAULT_MODEL_ALIAS = "claude-opus-4.6";
 const MODELS = {
   // ── Anthropic ──
+  // alwaysThinks: thinking is on by default and shares the max_tokens budget,
+  // so those models get extra output headroom in callLLM/stream.
+  "claude-fable-5":    { id: "claude-fable-5",              provider: "anthropic", label: "Claude Fable 5",   alwaysThinks: true },
+  "claude-opus-5":     { id: "claude-opus-5",               provider: "anthropic", label: "Claude Opus 5",    alwaysThinks: true },
+  "claude-opus-4.8":   { id: "claude-opus-4-8",            provider: "anthropic", label: "Claude Opus 4.8" },
   "claude-opus-4.7":   { id: "claude-opus-4-7",            provider: "anthropic", label: "Claude Opus 4.7" },
   "claude-opus-4.6":   { id: "claude-opus-4-6",            provider: "anthropic", label: "Claude Opus 4.6" },
   "claude-opus-4.5":   { id: "claude-opus-4-5-20251101",   provider: "anthropic", label: "Claude Opus 4.5" },
+  "claude-sonnet-5":   { id: "claude-sonnet-5",            provider: "anthropic", label: "Claude Sonnet 5",  alwaysThinks: true },
   "claude-sonnet-4.6": { id: "claude-sonnet-4-6",          provider: "anthropic", label: "Claude Sonnet 4.6" },
   "claude-sonnet-4.5": { id: "claude-sonnet-4-5-20250929", provider: "anthropic", label: "Claude Sonnet 4.5" },
   "claude-haiku-4.5":  { id: "claude-haiku-4-5-20251001",  provider: "anthropic", label: "Claude Haiku 4.5" },
   // ── OpenAI ──
+  "gpt-5.6-sol":   { id: "gpt-5.6-sol",   provider: "openai", label: "GPT-5.6 Sol" },
+  "gpt-5.6-terra": { id: "gpt-5.6-terra", provider: "openai", label: "GPT-5.6 Terra" },
+  "gpt-5.6-luna":  { id: "gpt-5.6-luna",  provider: "openai", label: "GPT-5.6 Luna" },
+  "gpt-5.5":    { id: "gpt-5.5",    provider: "openai", label: "GPT-5.5" },
   "gpt-5":      { id: "gpt-5",      provider: "openai", label: "GPT-5" },
   "gpt-5-mini": { id: "gpt-5-mini", provider: "openai", label: "GPT-5 mini" },
   "gpt-4.1":    { id: "gpt-4.1",    provider: "openai", label: "GPT-4.1" },
@@ -208,7 +218,8 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
         },
         body: JSON.stringify({
           model: m.id,
-          max_tokens: maxTokens,
+          // alwaysThinks models spend part of max_tokens on thinking
+          max_tokens: m.alwaysThinks ? maxTokens + 8192 : maxTokens,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -222,7 +233,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
       status: 504,
       isTimeout,
       error: isTimeout
-        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-4o) or disable XL mode."
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-5.6 Luna) or disable XL mode."
         : `Network error calling LLM API: ${fetchErr.message}`,
     };
   }
@@ -256,7 +267,12 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
     console.error("Anthropic API error:", JSON.stringify(data.error));
     return { ok: false, status: 422, error: data.error?.message || "Model returned an error." };
   }
-  const text = data.content?.[0]?.text || "";
+  if (data.stop_reason === "refusal") {
+    console.error("Anthropic refusal:", JSON.stringify(data.stop_details || {}));
+    return { ok: false, status: 422, error: "The model declined this request. Try again or use a different model." };
+  }
+  // Thinking-enabled models return a thinking block before the text block
+  const text = data.content?.find((b) => b.type === "text")?.text || "";
   if (!text) return { ok: false, status: 422, error: "Model returned empty response. Try again." };
   return { ok: true, text, modelUsed: data.model || m.id, usage: data.usage || null,
            truncated: data.stop_reason === "max_tokens" };
@@ -564,7 +580,8 @@ if (typeof awslambda !== "undefined") {
           },
           body: JSON.stringify({
             model: m.id,
-            max_tokens: streamMaxTokens,
+            // alwaysThinks models spend part of max_tokens on thinking
+            max_tokens: m.alwaysThinks ? streamMaxTokens + 8192 : streamMaxTokens,
             stream: true,
             system: systemPrompt,
             messages: [
