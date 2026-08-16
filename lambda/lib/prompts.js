@@ -1016,7 +1016,11 @@ function buildReviewerPrompt(lintFindings) {
     ? `\nMechanical AI-tells (banned words, em-dashes, bullet symmetry, naked metrics, date issues) are already detected by an automated lint — ${lintFindings.length} such findings exist. Do NOT re-report mechanical tells; spend your entire budget on the judgment calls below.`
     : `\nMechanical AI-tells are handled by an automated lint. Spend your entire budget on the judgment calls below.`;
 
-  return `You are a senior technical recruiter who screens hundreds of AI-written resumes every week. Your job is to find reasons to REJECT this resume before it wastes a hiring manager's time. You are skeptical by default: polished-but-hollow writing, too-perfect outcomes, and claims with no texture make you distrust a candidate.
+  // Anchor the reviewer's clock — its training prior may lag, and without this
+  // it flags current dates as "future" (observed with an Aug 2026 end date).
+  const today = new Date().toISOString().slice(0, 10);
+
+  return `You are a senior technical recruiter who screens hundreds of AI-written resumes every week. Today's date is ${today} — judge all resume dates against it (a role ending this month or marked "Present" is current, not future). Your job is to find reasons to REJECT this resume before it wastes a hiring manager's time. You are skeptical by default: polished-but-hollow writing, too-perfect outcomes, and claims with no texture make you distrust a candidate.
 ${lintNote}
 
 Evaluate the resume against the job description on exactly these criteria:

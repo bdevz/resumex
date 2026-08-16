@@ -350,11 +350,13 @@ async function handleAnalyze(body) {
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(r.text));
-  if (!resumeData) {
+  if (!resumeData || !Array.isArray(resumeData.experience) || resumeData.experience.length === 0) {
+    // A truncated response can still salvage a partial JSON object — treat a
+    // resume without experience as a failure, not a score-0 success.
     return response(422, {
       error: r.truncated
-        ? "Model response was cut off (too long)."
-        : "Model returned invalid JSON. Try again.",
+        ? "Model response was cut off (too long). Try a shorter length or a different model."
+        : "Model returned invalid or incomplete JSON. Try again.",
       raw_preview: r.text.substring(0, 500),
     });
   }
@@ -401,11 +403,13 @@ async function handleOptimize(body) {
 
   // Parse JSON and expand short keys to full keys
   const resumeData = expandKeys(extractJSON(r.text));
-  if (!resumeData) {
+  if (!resumeData || !Array.isArray(resumeData.experience) || resumeData.experience.length === 0) {
+    // A truncated response can still salvage a partial JSON object — treat a
+    // resume without experience as a failure, not a score-0 success.
     return response(422, {
       error: r.truncated
-        ? "Model response was cut off (too long)."
-        : "Model returned invalid JSON. Try again.",
+        ? "Model response was cut off (too long). Try a shorter length or a different model."
+        : "Model returned invalid or incomplete JSON. Try again.",
       raw_preview: r.text.substring(0, 500),
     });
   }
