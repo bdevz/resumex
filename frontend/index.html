@@ -416,6 +416,32 @@
       margin-bottom: 8px;
     }
 
+    /* ── Recruiter lint + adversarial review ── */
+    .lint-details { margin-top: 10px; font-size: 13px; }
+    .lint-details summary { cursor: pointer; color: var(--text-muted); padding: 6px 0; }
+    .lint-item, .review-finding {
+      display: flex; gap: 8px; align-items: flex-start;
+      padding: 8px 10px; margin: 6px 0; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 13px; line-height: 1.5;
+    }
+    .review-finding { cursor: pointer; }
+    .review-finding input { margin-top: 3px; }
+    .sev {
+      flex: 0 0 auto; padding: 1px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+    }
+    .sev-reject_risk { background: #7f1d1d; color: #fecaca; }
+    .sev-major { background: var(--amber-dim); color: var(--amber); }
+    .sev-minor { background: var(--surface-2); color: var(--text-muted); }
+    .finding-quote { color: var(--text-muted); font-style: italic; margin-top: 3px; }
+    .review-verdict {
+      padding: 12px 14px; border-radius: 8px; margin: 10px 0;
+      background: var(--surface); border: 1px solid var(--border); font-size: 14px; line-height: 1.6;
+    }
+    .review-verdict.verdict-no { border-color: #7f1d1d; }
+    .review-verdict.verdict-yes { border-color: var(--green, #14532d); }
+
     /* ── Animated progress display ── */
     #progress {
       display: none;
@@ -1130,6 +1156,12 @@
           </div>
         </div>
         <div id="timeline-warnings"></div>
+        <div id="lint-strip"></div>
+        <div id="review-section" style="margin-top:12px;">
+          <button class="btn-secondary" id="review-btn" onclick="runRecruiterReview()">Recruiter Review</button>
+          <span id="review-status" class="field-hint" style="margin-left:8px;"></span>
+          <div id="review-panel" style="display:none;"></div>
+        </div>
       </div>
 
       <!-- Professional Summary -->
@@ -1161,6 +1193,8 @@
   <script>
     // ── State ──
     let currentResumeData = null;
+    let lastRequest = null;      // { jd, model, length, domain, includeCertifications } from the last generation
+    let reviewFindings = [];     // findings from the last recruiter review
     let currentPassphrase = null;
     let currentUserName = null;
     let adminPassphrase = null;
@@ -1792,6 +1826,9 @@
         };
       }
 
+      // Remember the request so the recruiter review / revise passes can reuse it
+      lastRequest = { jd, model, length, domain, includeCertifications };
+
       try {
         // Step 1: Submit job
         const resp = await fetch(API_BASE + endpoint, {
@@ -1910,6 +1947,12 @@
         }
       }
 
+      // Recruiter lint strip + reset any previous review panel
+      renderLintStrip(data.lint);
+      document.getElementById("review-panel").style.display = "none";
+      document.getElementById("review-panel").innerHTML = "";
+      document.getElementById("review-status").textContent = "";
+
       // Summary
       document.getElementById("summary-text").textContent = resumeData.professional_summary || "";
 
@@ -1994,6 +2037,125 @@
       return div.innerHTML;
     }
 
+    // ── Recruiter lint + adversarial review ──
+
+    function renderLintStrip(lint) {
+      const el = document.getElementById("lint-strip");
+      if (!lint || lint.length === 0) { el.innerHTML = ""; return; }
+      const majors = lint.filter(f => f.severity !== "minor").length;
+      const minors = lint.length - majors;
+      let html = `<details class="lint-details"><summary>Recruiter lint: ${majors} major, ${minors} minor — mechanical AI-tells a screener would spot</summary>`;
+      for (const f of lint) {
+        html += `<div class="lint-item"><span class="sev sev-${escapeHtml(f.severity)}">${escapeHtml(f.severity)}</span><span>${escapeHtml(f.message)}${f.quote ? `<div class="finding-quote">"${escapeHtml(f.quote)}"</div>` : ""}</span></div>`;
+      }
+      el.innerHTML = html + "</details>";
+    }
+
+    async function runRecruiterReview() {
+      if (!currentResumeData) return;
+      if (!lastRequest || !lastRequest.jd) {
+        showError("Recruiter review needs the original job description — run it right after generating.");
+        return;
+      }
+      const btn = document.getElementById("review-btn");
+      const st = document.getElementById("review-status");
+      btn.disabled = true;
+      st.textContent = "Reviewing — a model from the other family plays skeptical recruiter (~30s)…";
+      hideError();
+      try {
+        const resp = await fetch(API_BASE + "/review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase, "X-User-Name": currentUserName || "" },
+          body: JSON.stringify({
+            resumeData: currentResumeData,
+            jd: lastRequest.jd,
+            model: lastRequest.model,
+            length: lastRequest.length,
+          }),
+        });
+        if (!resp.ok) {
+          const errBody = await resp.json().catch(() => ({}));
+          throw new Error(errBody.error || `Server error (${resp.status})`);
+        }
+        const submitData = await resp.json();
+        const data = submitData.jobId ? await pollForResult(submitData.jobId) : submitData;
+        renderReviewPanel(data);
+        st.textContent = `Reviewed by ${data.reviewer_model || "?"}`;
+      } catch (err) {
+        st.textContent = "";
+        showError(err.message || "Review failed. Try again.");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderReviewPanel(data) {
+      reviewFindings = data.findings || [];
+      const panel = document.getElementById("review-panel");
+      let html = "";
+      if (data.verdict) {
+        const ps = (data.verdict.phone_screen || "?").toLowerCase();
+        html += `<div class="review-verdict verdict-${escapeHtml(ps)}"><strong>Phone screen: ${escapeHtml(ps)}</strong> — ${escapeHtml(data.verdict.reason || "")}</div>`;
+      }
+      if (reviewFindings.length === 0) {
+        html += `<div class="field-hint" style="margin-top:8px;">No judgment-level findings — check the lint strip above for mechanical issues.</div>`;
+      }
+      reviewFindings.forEach((f, i) => {
+        const checked = (f.severity === "reject_risk" || f.severity === "major") ? "checked" : "";
+        html += `<label class="review-finding"><input type="checkbox" data-fi="${i}" ${checked}>` +
+          `<span class="sev sev-${escapeHtml(f.severity || "minor")}">${escapeHtml(f.severity || "minor")}</span>` +
+          `<span>${escapeHtml(f.message || "")}` +
+          (f.quote ? `<div class="finding-quote">"${escapeHtml(f.quote)}"</div>` : "") +
+          (f.suggested_rewrite ? `<div class="finding-quote">Fix: ${escapeHtml(f.suggested_rewrite)}</div>` : "") +
+          `</span></label>`;
+      });
+      if (reviewFindings.length > 0) {
+        html += `<button class="btn-primary" id="apply-fixes-btn" style="margin-top:10px;" onclick="applyReviewFixes()">Apply selected fixes</button>`;
+      }
+      panel.innerHTML = html;
+      panel.style.display = "block";
+    }
+
+    async function applyReviewFixes() {
+      const selected = [...document.querySelectorAll('#review-panel input[type="checkbox"]:checked')]
+        .map((cb) => reviewFindings[parseInt(cb.dataset.fi, 10)])
+        .filter(Boolean);
+      if (selected.length === 0) { showError("Select at least one finding to fix."); return; }
+      const btn = document.getElementById("apply-fixes-btn");
+      const st = document.getElementById("review-status");
+      btn.disabled = true;
+      st.textContent = `Applying ${selected.length} fixes with ${lastRequest.model} (the original writer)…`;
+      hideError();
+      try {
+        const resp = await fetch(API_BASE + "/revise", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Passphrase": currentPassphrase, "X-User-Name": currentUserName || "" },
+          body: JSON.stringify({
+            resumeData: currentResumeData,
+            jd: lastRequest.jd,
+            findings: selected,
+            model: lastRequest.model,
+            length: lastRequest.length,
+            domain: lastRequest.domain,
+            includeCertifications: lastRequest.includeCertifications,
+          }),
+        });
+        if (!resp.ok) {
+          const errBody = await resp.json().catch(() => ({}));
+          throw new Error(errBody.error || `Server error (${resp.status})`);
+        }
+        const submitData = await resp.json();
+        const data = submitData.jobId ? await pollForResult(submitData.jobId) : submitData;
+        if (!data || !data.resumeData) throw new Error(data?.error || "No revised resume received.");
+        currentResumeData = data.resumeData;
+        renderResults(data); // re-renders scores + lint, resets the review panel
+      } catch (err) {
+        st.textContent = "";
+        if (btn) btn.disabled = false;
+        showError(err.message || "Revise failed. Try again.");
+      }
+    }
+
     // ── Download DOCX ──
     async function downloadDocx(e) {
       if (!currentResumeData) return;
@@ -2049,6 +2211,8 @@
     // ── Start over ──
     function startOver() {
       currentResumeData = null;
+      lastRequest = null;
+      reviewFindings = [];
       // If we were viewing a saved resume, go back to the history list
       if (currentView === "history") { switchView("history"); return; }
       document.getElementById("results").style.display = "none";

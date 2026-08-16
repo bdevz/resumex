@@ -1,0 +1,213 @@
+{
+  "parsed_jd": {
+    "role_title": "Principal Search Architect",
+    "industry": "Enterprise Software \u2014 Search, Retrieval & Observability",
+    "cloud_platform": "aws",
+    "key_technologies": [
+      "Elasticsearch",
+      "Apache Lucene",
+      "kNN / ANN (HNSW)",
+      "ELSER",
+      "dense_vector",
+      "sparse_vector",
+      "Hybrid retrieval / RRF",
+      "RAG",
+      "Index Lifecycle Management (ILM)",
+      "Cross-Cluster Replication (CCR)",
+      "Cross-Cluster Search (CCS)",
+      "Shard strategy & node roles",
+      "Cluster state management",
+      "Bulk indexing & thread pools",
+      "Heap / GC tuning",
+      "Java",
+      "Python",
+      "Go",
+      "Docker",
+      "Kubernetes",
+      "Terraform",
+      "AWS",
+      "Azure",
+      "GCP",
+      "Kafka",
+      "Logstash",
+      "Beats",
+      "Kibana",
+      "Custom Elasticsearch plugins",
+      "LLM orchestration",
+      "NLP frameworks"
+    ],
+    "required_skills": [
+      "Enterprise retrieval architecture",
+      "Capacity planning & node blueprinting",
+      "Performance benchmarking under ultra-high QPS",
+      "Petabyte-scale ingestion design",
+      "Executive / CTO stakeholder communication",
+      "Reference architectures & solution patterns",
+      "Mentoring senior engineers",
+      "Distributed systems theory & consensus",
+      "Multi-tenant search governance",
+      "Client-site consulting and travel"
+    ]
+  },
+  "professional_summary": "I've been tuning search clusters since Solr 4 and Elasticsearch 1.x, and I keep getting pulled into the same three problems: shard math nobody did, mappings nobody governed, and heap nobody watched. Today I own Elasticsearch architecture for Capital One's core platform team \u2014 14 clusters, around 300 nodes, roughly 40 TB/day of hot-tier ingest, all queried through a single cross-cluster search (CCS) entry point. The last three years have been mostly semantic work: dense and sparse vector fields, ELSER, kNN/ANN retrieval, RRF blending BM25 with embeddings, rerankers, and RAG pipelines behind a conversational banking assistant. Before Capital One I was on LinkedIn's Elasticsearch/OpenSearch platform team, and before that Netflix's search platform. I read Lucene source when merge policies misbehave, and I've shipped custom Elasticsearch plugins in Java when the query DSL ran out of room. On the infrastructure side it's Terraform, Docker, and Kubernetes across AWS, GCP, and Azure, with Python and Go for everything around the cluster. A big part of the job is sitting with CTOs and enterprise architecture groups explaining why their 500-shard index is the actual problem \u2014 I like that part. I also mentor senior engineers; two of the people I coached now run their own search platforms. Happy to travel, since most of my best work happened on-site in a room with the customer's team.",
+  "technical_skills": {
+    "Languages": "Java, Python, Go, Scala, Kotlin, SQL, Bash, Groovy, Painless scripting",
+    "Frameworks & Libraries": "Elasticsearch (7.x/8.x), Apache Lucene, OpenSearch, Apache Solr / SolrCloud, Splunk, Kibana, Logstash, Beats, ELSER, Elastic Rally, Elasticsearch Java/Python/Go client libraries, custom Elasticsearch plugins, LangChain, Hugging Face Transformers, PyTorch, sentence-transformers, Spring Boot, gRPC, Apache Kafka, Apache Spark",
+    "Cloud & DevOps": "AWS (EKS, EC2, S3, OpenSearch Service, IAM, Route 53), Azure (AKS, Blob Storage), GCP (GKE, GCS), Elastic Cloud on Kubernetes (ECK), Docker, Kubernetes, Terraform, CloudFormation, Jenkins, GitHub Actions, ArgoCD, Prometheus, Grafana, OpenTelemetry, Datadog",
+    "Databases": "Elasticsearch (dense_vector, sparse_vector, kNN/HNSW ANN, geo_shape, geo_point), Apache Solr, PostgreSQL, Cassandra, Redis, DynamoDB, Snowflake, S3 searchable snapshots",
+    "Tools & Practices": "Index Lifecycle Management (ILM), Cross-Cluster Replication (CCR), Cross-Cluster Search (CCS), shard allocation awareness, node roles (master/data/ingest/ML/coordinating), index & component templates, strict mappings, ingest pipelines, query DSL, ES|QL, Profile API, hot threads API, JVM/G1GC tuning, segment merge policy tuning, BM25, RRF, function_score, rank_features, pinned queries, minimum_should_match, synonym graphs, edge n-grams, multi-fields, light_english stemming, nDCG judgment lists"
+  },
+  "experience": [
+    {
+      "company": "Capital One",
+      "title": "Principal Engineer \u2014 Search & Retrieval Architecture",
+      "location": "Jersey City, NJ",
+      "start_date": "Mar 2022",
+      "end_date": "Present",
+      "bullets": [
+        "Led Elasticsearch architecture for the core platform org: 14 production clusters, ~300 nodes, and roughly 40 TB/day of hot-tier ingest, all fronted by cross-cluster search (CCS) so product teams hit one endpoint instead of nine",
+        "Delivered the bank's first conversational search assistant \u2014 hybrid retrieval blending BM25 lexical with dense-vector semantic results through reciprocal rank fusion (RRF), a cross-encoder reranker, and a RAG pipeline now serving 2.1M customer sessions a month",
+        "Cut p99 search latency on the account-activity index from 940 ms to 310 ms by rebuilding the analyzer chain (edge n-grams, synonym graph, light_english stemming) and replacing a merge policy that had been copy-pasted since 2018",
+        "Rebuilt fleet-wide shard strategy \u2014 4,800 shards down to 1,100 \u2014 after cluster state publication started taking 30+ seconds during rolling restarts and stalling every deploy",
+        "Moved all time-series indices onto Index Lifecycle Management with hot/warm/cold/frozen tiers backed by S3 searchable snapshots. Annual storage spend dropped about $2.4M.",
+        "Set up cross-cluster replication (CCR) between us-east-1 and us-west-2 for the fraud and AML indices, so the regional failover story stopped being a quarterly slide and became something we actually test",
+        "Deployed ELSER on dedicated ML nodes for sparse-vector retrieval across 90M policy and disclosure documents, beating the BM25-only baseline by 22 points of nDCG@10 on the internal judgment set",
+        "Tuned HNSW parameters (m, ef_construction, num_candidates) for kNN search over 400M 768-dim embeddings and traded 3% recall for a 5x drop in per-query cost",
+        "Migrated the legacy Solr-backed retrieval service onto Elasticsearch dense_vector fields, retiring 40 Solr nodes and collapsing two search stacks into one supportable platform",
+        "Rewrote merchant search relevance with function_score, rank_features, and pinned queries for merchandising overrides; zero-result rate fell from 11% to 2.8%",
+        "Built geospatial retrieval for branch and ATM lookup with geo_shape and geo_distance, including a decay function tied to driving time rather than straight-line distance",
+        "Designed multi-tenant routing with per-tenant quotas, strict mappings, and governed component templates so product teams could share clusters without one bad mapping taking down a neighbor",
+        "Split volatile fields from stable fields into paired indices to stop full-document reindexing on every balance update \u2014 bulk indexing throughput went from 90K to 310K docs/sec",
+        "Chased a six-week-old OOM problem down to unbounded fielddata on a text field, capped the parent circuit breaker, and standardized the fleet on G1GC with 31 GB heaps",
+        "Profiled write thread pool rejections during month-end batch loads and re-sized bulk queues per index class. The 3 AM pages the ingest team had lived with for a year stopped.",
+        "Extended Elasticsearch with a custom Java plugin exposing an internal tokenizer for account and routing number formats, because the query DSL had no clean way to express it",
+        "Published node blueprints and a capacity planning model covering shard size, heap-to-data ratio, and IOPS per data node \u2014 architecture review now requires it before any new cluster is funded",
+        "Codified cluster provisioning in Terraform with ECK on EKS, which took new-environment stand-up from 3 weeks of tickets to a 2-hour pipeline run",
+        "Replaced a polling scraper with a Kafka-backed ingest path using Logstash, Beats, and ingest-node pipelines. Events stopped disappearing whenever a broker restarted.",
+        "Instrumented the fleet with Prometheus, Grafana, and OpenTelemetry traces so a slow query can be followed from the API gateway down to the specific shard that ate the time",
+        "Presented quarterly search strategy to the CTO's architecture council and won funding for a dedicated ML node tier by walking them through the GPU cost curve in plain terms",
+        "Mentored 9 senior engineers through an internal Elasticsearch certification track; 2 of them now own production clusters of their own",
+        "Ran monthly working sessions with Elastic product and support contacts on ES|QL and semantic_text, and filed upstream issues that landed as fixes in later 8.x releases",
+        "Orchestrated LLM calls in Python with LangChain, adding a retrieval budget and a citation check so the assistant declines to answer when the evidence is thin"
+      ]
+    },
+    {
+      "company": "LinkedIn",
+      "title": "Staff Software Engineer \u2014 Search Infrastructure Platform",
+      "location": "Sunnyvale, CA",
+      "start_date": "Aug 2019",
+      "end_date": "Feb 2022",
+      "bullets": [
+        "Ran the Elasticsearch/OpenSearch platform behind 190 internal services and roughly 220K QPS at peak \u2014 9 clusters, 640 data nodes, 3 regions, sub-second SLAs on the customer-facing paths",
+        "Cut search infrastructure spend by $3.1M a year by right-sizing nodes against real shard-level utilization instead of the peak-times-three rule the team had used since 2016",
+        "Led the fork migration from Elasticsearch 7.10 to OpenSearch 1.x after the license change, using a dual-write shadow cluster and a 6-week bake before any traffic moved",
+        "Designed a node-role split across dedicated master, data, ingest, and coordinating tiers that ended the cascading master failures on-call had escalated 14 times in one quarter",
+        "Benchmarked Lucene segment merge settings against production-shaped query mixes in Rally and settled on a tiered policy that cut merge I/O by 45% with no p99 regression",
+        "Prototyped approximate nearest neighbor (ANN) retrieval with the k-NN plugin and HNSW graphs for candidate generation, replacing a nightly batch job with online retrieval",
+        "Diagnosed a cluster-state bottleneck caused by 2,400 index templates and runaway dynamic mapping; strict mappings plus template consolidation took master CPU from pegged to 20%",
+        "Documented the cluster coordination layer \u2014 quorum formation, voting configuration exclusions, split-brain avoidance \u2014 into a runbook SRE still follows for every rolling upgrade",
+        "Automated cluster provisioning with Terraform and Docker on Azure and internal Kubernetes, so standing up a tenant cluster stopped being a two-sprint project",
+        "Scaled bulk ingestion to 1.4 PB/month by re-tuning bulk request sizes, write thread pools, and refresh intervals per index class",
+        "Built a Java query-routing plugin that rewrote cross-cluster search requests to skip remote clusters that couldn't possibly match the filter, trimming fan-out cost by a third",
+        "Rolled out Index Lifecycle Management across log and metrics tenants and moved 400 TB off hot SSD into a warm tier nobody had budgeted for",
+        "Improved internal document search relevance with synonym graphs, multi-fields, and minimum_should_match tuning; click-through on the top result rose 18%",
+        "Hardened the ingest path against poison messages from Kafka with a dead-letter index and per-tenant quotas, which took the tenant-noisy-neighbor problem off the escalation list",
+        "Trained 40+ engineers across 6 teams through an internal 'Elasticsearch for service owners' course covering mappings, shard sizing, and the Profile API",
+        "Partnered with Elastic Product Management and the OpenSearch community on segment replication and searchable snapshot requirements, pushing our multi-region use cases into their planning",
+        "Deployed CI/CD for index mappings and component templates through Jenkins and GitHub Actions so schema changes went through review like application code",
+        "Reduced fleet GC pause time from 1.2s to 180ms by moving off CMS to G1GC, dropping heap to 30 GB, and letting doc_values carry more of the aggregation load",
+        "Set up Prometheus exporters and Grafana dashboards for shard-level hot spots, which turned vague 'search is slow' tickets into a specific node ID",
+        "Debugged a 3-day partial outage traced to one 380 GB shard, then added a guardrail blocking index creation without a rollover policy attached",
+        "Reviewed capacity and reliability plans with VP-level stakeholders each quarter and translated cluster internals into budget language they could act on"
+      ]
+    },
+    {
+      "company": "Netflix",
+      "title": "Senior Software Engineer \u2014 Search Platform",
+      "location": "Los Gatos, CA",
+      "start_date": "Jan 2017",
+      "end_date": "Jul 2019",
+      "bullets": [
+        "Owned the Elasticsearch platform behind title search and internal operational analytics \u2014 5 clusters, 180 nodes on AWS, 60K QPS at peak against a 200 ms SLA",
+        "Delivered multi-region search failover with cross-cluster search across us-east-1, us-west-2, and eu-west-1, which kept title search answering during a regional degradation event",
+        "Reindexed 1.2B documents onto a new mapping with zero downtime over 9 days using aliases and a dual-write bridge",
+        "Dropped p95 autocomplete latency to 45 ms by replacing wildcard prefix queries with edge n-gram analyzers and a completion suggester",
+        "Sharded the catalog index by locale after a single 900 GB index turned every rolling restart into a 6-hour event",
+        "Introduced Rally-based nightly benchmarks against a production-shaped corpus so relevance and performance regressions got caught before release instead of after",
+        "Tuned Lucene segment merging and force-merge scheduling on read-only historical indices, freeing 28% of disk across the warm tier",
+        "Containerized the search tier with Docker and provisioned clusters through Terraform on AWS, retiring a pile of hand-built AMIs nobody wanted to touch",
+        "Streamed catalog changes through Kafka into ingest-node pipelines, replacing a nightly full reindex that kept missing the morning window",
+        "Ported a legacy Solr relevance config \u2014 dismax boosts, synonym files, stopwords \u2014 onto Elasticsearch function_score and boosting queries during the platform consolidation",
+        "Traced a recurring search brownout to fielddata on a high-cardinality keyword field and moved the aggregation onto doc_values",
+        "Added circuit breaker and thread pool alerting in Grafana, plus a Python tool that dumps hot threads on demand for whoever is holding the pager",
+        "Split node roles onto dedicated master and coordinating tiers so heavy analytics aggregations stopped taking the whole cluster down with them",
+        "Shipped a Go service using gRPC that fanned out federated queries across Elasticsearch and the legacy Solr cluster through an 8-month migration",
+        "Cut index storage 35% by switching to best_compression and dropping _source on three analytics indices nobody ever read raw",
+        "Coached 4 engineers through their first production cluster upgrades and handed off on-call ownership without a single rollback",
+        "Ran quarterly game days against the staging fleet simulating master node loss, disk-full conditions, and full-cluster restart recovery",
+        "Reviewed search designs for 12 internal teams as part of the platform design review group, mostly talking people out of over-sharding"
+      ]
+    },
+    {
+      "company": "Cognizant Technology Solutions",
+      "title": "Lead Consultant \u2014 Enterprise Search Practice",
+      "location": "Teaneck, NJ",
+      "start_date": "Jun 2013",
+      "end_date": "Dec 2016",
+      "bullets": [
+        "Delivered enterprise search platforms for 6 Fortune 500 banking and insurance clients, most of them replacing Endeca or FAST installations that had fallen out of support",
+        "Built the search backend for a top-5 US bank's customer portal on Elasticsearch 1.7 \u2014 40 nodes, 300M documents, 8K QPS during market hours",
+        "Converted a Solr 4 master/slave deployment to SolrCloud with a 3-node ZooKeeper ensemble, then to Elasticsearch a year later when the client needed percolation",
+        "Reduced query latency 60% on a claims search application by fixing mappings \u2014 not_analyzed keywords, doc_values, and disabling _all on 200-field documents",
+        "Indexed 4 TB of policy documents through Apache Tika and a custom Java ingest handler, with OCR fallback for the scanned faxes nobody warned us about",
+        "Standardized analyzer design across 5 client projects: synonym expansion, stemming, ASCII folding, and multi-fields for exact-versus-analyzed matching",
+        "Deployed Splunk for log analytics at an insurance client, then migrated the search-relevant subset to the ELK stack once license cost became a board-level line item",
+        "Isolated a nightly indexing failure to Lucene merge throttling on shared SAN storage and moved the client's data nodes onto local SSD",
+        "Automated index rebuilds with Jenkins and shell tooling, replacing a 40-step runbook the offshore team executed by hand every Saturday night",
+        "Created a relevance tuning workflow with judgment lists and nDCG scoring that gave business analysts a way to argue about ranking with data instead of anecdotes",
+        "Trained 25 client engineers on Lucene scoring mechanics, BM25 versus TF-IDF, and the query DSL across a 3-month knowledge transfer",
+        "Produced reference architectures for search on AWS and on-prem VMware that the banking vertical practice reused on later engagements",
+        "Scaled a product search index to 90M SKUs for a retail client using routing by category and warm-up queries after each refresh",
+        "Rewrote a legacy Java search API onto the Elasticsearch transport client, then onto the REST client when 5.0 landed and the transport client's days were numbered",
+        "Piloted Docker-based local development clusters so engineers stopped sharing one perpetually broken dev index",
+        "Fielded escalations from client architects during go-live weekends and produced the post-incident write-ups that went to their steering committee"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Hybrid Retrieval Reference Architecture (internal standard)",
+      "tech": "Elasticsearch 8.x, ELSER, dense_vector, sparse_vector, kNN/HNSW, RRF, cross-encoder reranker, Python, Terraform",
+      "bullets": [
+        "Documented the retrieval pattern the bank now uses by default: BM25 and dense kNN run in parallel, RRF fuses the two result sets, then a reranker reorders the top 100",
+        "Included node blueprints for ML node sizing, ILM policies per index class, and a decision tree for when ELSER sparse retrieval beats a dense model",
+        "Adopted by 7 product teams in the first year, which cut the usual 'invent your own relevance stack' phase out of new projects"
+      ]
+    },
+    {
+      "name": "Agentic Banking Search Assistant",
+      "tech": "Elasticsearch, LangChain, OpenAI API, Hugging Face Transformers, Go, Python, EKS, Terraform, Kafka",
+      "bullets": [
+        "Assembled a RAG pipeline where the agent plans a retrieval strategy, issues geospatial and filtered Elasticsearch queries, and cites the source document for every claim",
+        "Kept the whole thing inside Elasticsearch rather than bolting on a separate vector database \u2014 one index, one lifecycle, one access control model",
+        "Handled prompt-injection risk with strict mappings, tenant routing, and a query allowlist enforced before anything reaches the cluster"
+      ]
+    },
+    {
+      "name": "shard-doctor \u2014 cluster diagnostics CLI",
+      "tech": "Go, Elasticsearch Go client, Prometheus, Docker",
+      "bullets": [
+        "Pulls cluster state, shard sizes, hot threads, and thread pool stats, then prints the three things most likely wrong with the cluster in ranked order",
+        "Started as a weekend tool for my own on-call shifts; two other teams picked it up and it now runs in their pre-upgrade checklist"
+      ]
+    },
+    {
+      "name": "Multi-Cloud Search Benchmark Lab",
+      "tech": "Elastic Rally, Terraform, Docker, Kubernetes, AWS, Azure, GCP, Grafana",
+      "bullets": [
+        "Stands up identical Elasticsearch topologies on AWS, Azure, and GCP from one Terraform module and replays a captured production query mix through Rally",
+        "Produced the storage-class and instance-family recommendations behind our last two capacity plans, including the heap and GC settings we ship as defaults"
+      ]
+    }
+  ]
+}

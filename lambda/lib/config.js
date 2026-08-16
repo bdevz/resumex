@@ -752,6 +752,41 @@ const DOMAIN_PACKS = {
   },
 };
 
+// ── Recruiter adversarial review rubric ─────────────────────────────────────
+// Single source of truth for the deterministic lint (lib/review.js) and the
+// cross-family reviewer prompt (prompts.js). Lexicon reuses ANTI_SLOP —
+// only recruiter-specific additions live here.
+// Spec: docs/superpowers/specs/2026-08-15-recruiter-adversarial-review-design.md
+const RECRUITER_RUBRIC = {
+  // Words recruiters flag as AI tells that are not banned at generation time.
+  extra_flag_words: ["honed", "showcasing", "meticulous", "results-driven", "dynamic", "passionate"],
+
+  em_dash_max_per_500_words: 2, // flag above this density, min 3 absolute
+
+  bullet_symmetry: {
+    min_bullets: 4,               // need at least this many bullets to judge a job
+    min_length_stddev_ratio: 0.18, // stddev/mean of bullet lengths below this → robotic uniformity
+    max_same_opener_ratio: 0.6,    // more than this share opening with the same word → flag
+  },
+
+  naked_metric: {
+    context_words: ["from", "to", "baseline", "vs", "versus", "p99", "p95", "previously"],
+    window_chars: 80,   // a %/× claim needs a context word within this window
+    max_plausible_pct: 200, // improvement percentages above this read as fabricated
+  },
+
+  duplicate_bullet_overlap: 0.7, // Jaccard token overlap above this → near-duplicate
+  unevidenced_skill_ratio: 0.4,  // more than this share of skills unevidenced → keyword stuffing
+
+  // Judgment criteria — mirrored verbatim into the reviewer prompt.
+  reviewer_criteria: [
+    { key: "jd_alignment", ask: "Which must-have JD requirements have no supporting evidence anywhere in the resume?" },
+    { key: "fabrication_smell", ask: "Which claims read as fabricated — no tools named, no obstacles or trade-offs, uniformly perfect outcomes?" },
+    { key: "seniority_voice", ask: "Where does the voice not match the target level (e.g. mid-level phrasing for a Principal role)?" },
+    { key: "phone_screen_test", ask: "Would you phone-screen this candidate? What, specifically, stops you?" },
+  ],
+};
+
 module.exports = {
   API,
   CONTACT,
@@ -772,6 +807,7 @@ module.exports = {
   SKILL_CATEGORIES,
   SOFT_SKILL_RULES,
   ANTI_SLOP,
+  RECRUITER_RUBRIC,
   PROMPT_VERBS,
   IMPLICIT_KEYWORD_RULES,
   DOMAIN_PACKS,

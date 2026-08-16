@@ -11,7 +11,8 @@
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
-const { buildSystemPrompt, buildSystemPromptXL, buildSystemPromptExtended, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeSystemPromptExtended, buildOptimizeUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { buildSystemPrompt, buildSystemPromptXL, buildSystemPromptExtended, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeSystemPromptExtended, buildOptimizeUserMessage, buildReviewerPrompt, buildReviewerUserMessage, buildRevisePrompt, buildReviseUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
+const { lintResume } = require("./lib/review");
 const { buildResume } = require("./lib/docx-builder");
 const config = require("./lib/config");
 const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
@@ -365,6 +366,7 @@ async function handleAnalyze(body) {
     resumeData,
     scoring,
     timeline_warnings,
+    lint: lintResume(resumeData, { length: len }),
     model_used: r.modelUsed,
     usage: r.usage,
   });
@@ -415,9 +417,113 @@ async function handleOptimize(body) {
     resumeData,
     scoring,
     timeline_warnings,
+    lint: lintResume(resumeData, { length: len }),
     model_used: r.modelUsed,
     usage: r.usage,
     mode: "optimize",
+  });
+}
+
+// ── Route: POST /review (recruiter adversarial review) ──
+// Spec: docs/superpowers/specs/2026-08-15-recruiter-adversarial-review-design.md
+
+// Cross-family reviewer: a model family is blind to its own writing tics.
+// Deterministic fallback if the preferred reviewer's provider has no API key.
+function pickReviewer(generatorModelInput) {
+  const gen = modelInfo(generatorModelInput || "");
+  const preferred = gen.provider === "openai" ? "claude-sonnet-5" : "gpt-5.6-terra";
+  const fallback = gen.provider === "openai" ? "gpt-5.6-terra" : "claude-sonnet-5";
+  const hasKey = (alias) =>
+    MODELS[alias].provider === "openai" ? !!process.env.OPENAI_API_KEY : !!process.env.ANTHROPIC_API_KEY;
+  return hasKey(preferred) ? preferred : fallback;
+}
+
+async function handleReview(body) {
+  const { resumeData, jd, model: generatorModel } = body;
+  if (!resumeData || !resumeData.experience) {
+    return response(400, { error: "Missing resumeData with experience array" });
+  }
+  if (!jd || jd.trim().length < 50) {
+    return response(400, { error: "Job description too short (need at least 50 characters)" });
+  }
+
+  const len = resolveLength(body);
+  const lint = lintResume(resumeData, { length: len });
+  const reviewerAlias = pickReviewer(generatorModel);
+
+  const r = await callLLM(
+    reviewerAlias,
+    buildReviewerPrompt(lint),
+    buildReviewerUserMessage(jd, resumeData),
+    4096
+  );
+  if (!r.ok) {
+    return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
+  }
+
+  const review = extractJSON(r.text);
+  if (!review || !Array.isArray(review.findings)) {
+    return response(422, {
+      error: "Reviewer returned invalid JSON. Try again.",
+      raw_preview: r.text.substring(0, 500),
+    });
+  }
+
+  return response(200, {
+    reviewer_model: r.modelUsed || reviewerAlias,
+    verdict: review.verdict || null,
+    findings: review.findings.slice(0, 15),
+    lint,
+    usage: r.usage,
+    mode: "review",
+  });
+}
+
+// ── Route: POST /revise (apply accepted review findings) ──
+
+async function handleRevise(body) {
+  const { resumeData, jd, findings, model: modelInput, domain, includeCertifications } = body;
+  if (!resumeData || !resumeData.experience) {
+    return response(400, { error: "Missing resumeData with experience array" });
+  }
+  if (!jd || jd.trim().length < 50) {
+    return response(400, { error: "Job description too short (need at least 50 characters)" });
+  }
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return response(400, { error: "No findings selected to fix" });
+  }
+
+  const dom = domain || "software";
+  const len = resolveLength(body);
+
+  const r = await callLLM(
+    modelInput,
+    buildRevisePrompt(dom, len, includeCertifications),
+    buildReviseUserMessage(jd, resumeData, findings),
+    maxTokensFor(len)
+  );
+  if (!r.ok) {
+    return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
+  }
+
+  const revised = expandKeys(extractJSON(r.text));
+  if (!revised || !revised.experience) {
+    return response(422, {
+      error: r.truncated
+        ? "Model response was cut off (too long)."
+        : "Model returned invalid revised JSON. Try again.",
+      raw_preview: r.text.substring(0, 500),
+    });
+  }
+
+  return response(200, {
+    resumeData: revised,
+    scoring: scoreResume(revised, dom),
+    timeline_warnings: validateTimeline(revised, dom),
+    lint: lintResume(revised, { length: len }),
+    model_used: r.modelUsed,
+    usage: r.usage,
+    mode: "revise",
   });
 }
 
@@ -659,6 +765,7 @@ if (typeof awslambda !== "undefined") {
         resumeData,
         scoring,
         timeline_warnings,
+        lint: lintResume(resumeData, { length: len }),
         model_used: m.id,
         mode: mode === "optimize" ? "optimize" : undefined,
       })}\n\n`);
@@ -767,6 +874,10 @@ exports.handler = async (event) => {
       let result;
       if (route === "optimize") {
         result = await handleOptimize(body);
+      } else if (route === "review") {
+        result = await handleReview(body);
+      } else if (route === "revise") {
+        result = await handleRevise(body);
       } else {
         result = await handleAnalyze(body);
       }
@@ -786,6 +897,11 @@ exports.handler = async (event) => {
           resumeData: resultBody.resumeData,
           scoring: resultBody.scoring,
           timeline_warnings: resultBody.timeline_warnings,
+          lint: resultBody.lint,
+          // review-route fields (undefined on other routes, dropped by JSON)
+          reviewer_model: resultBody.reviewer_model,
+          verdict: resultBody.verdict,
+          findings: resultBody.findings,
           model_used: resultBody.model_used,
           usage: resultBody.usage,
           mode: resultBody.mode,
@@ -793,6 +909,9 @@ exports.handler = async (event) => {
 
         // Save to per-user history. Best-effort: a failure here must never
         // affect the generated resume the user is waiting on.
+        // Reviews produce no resume — nothing to save; revised resumes save
+        // as new entries through this same path.
+        if (route === "review") return response(200, { ok: true });
         try {
           await writeHistory(buildHistoryRecord({
             id: jobId,
@@ -858,6 +977,14 @@ exports.handler = async (event) => {
 
     if (path === "/optimize" && method === "POST") {
       return await startAsyncJob({ ...body, __userName: userName }, "optimize");
+    }
+
+    if (path === "/review" && method === "POST") {
+      return await startAsyncJob({ ...body, __userName: userName }, "review");
+    }
+
+    if (path === "/revise" && method === "POST") {
+      return await startAsyncJob({ ...body, __userName: userName }, "revise");
     }
 
     if (path === "/build" && method === "POST") {

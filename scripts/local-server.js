@@ -14,6 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const { buildResume } = require("../lambda/lib/docx-builder");
 const prompts = require("../lambda/lib/prompts");
+const { lintResume } = require("../lambda/lib/review");
 
 const PORT = process.env.PORT || 8787;
 const INDEX = path.join(__dirname, "..", "frontend", "index.html");
@@ -122,8 +123,22 @@ const server = http.createServer(async (req, res) => {
         resumeData,
         scoring: prompts.scoreResume(resumeData, dom),
         timeline_warnings: prompts.validateTimeline(resumeData, dom),
+        lint: lintResume(resumeData, { length: L }),
         model_used: "local",
         mode: url === "/optimize" ? "optimize" : undefined,
+      });
+    }
+
+    // Deterministic lint only — the LLM review/revise passes need the deployed
+    // Lambda (cross-family model routing); locally we return lint so the UI works.
+    if (url === "/review") {
+      if (!body.resumeData) return send(res, 400, { error: "Missing resumeData" });
+      return send(res, 200, {
+        reviewer_model: "local-lint-only",
+        verdict: { phone_screen: "borderline", reason: "Local server runs lint only — deploy for the full cross-family recruiter review." },
+        findings: [],
+        lint: lintResume(body.resumeData, { length: len(body) }),
+        mode: "review",
       });
     }
     return send(res, 404, { error: "Not found", url });

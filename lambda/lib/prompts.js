@@ -1003,6 +1003,77 @@ function buildAntiSlopPromptSection(mode, domain) {
   return section;
 }
 
+// ── Recruiter adversarial review prompts ────────────────────────────────────
+// Spec: docs/superpowers/specs/2026-08-15-recruiter-adversarial-review-design.md
+
+// System prompt for the cross-family reviewer. The reviewer only critiques —
+// it never rewrites the resume (that's the revise pass, run by the generator).
+function buildReviewerPrompt(lintFindings) {
+  const { RECRUITER_RUBRIC } = require("./config");
+  const criteria = RECRUITER_RUBRIC.reviewer_criteria
+    .map((c) => `- ${c.key}: ${c.ask}`).join("\n");
+  const lintNote = lintFindings && lintFindings.length
+    ? `\nMechanical AI-tells (banned words, em-dashes, bullet symmetry, naked metrics, date issues) are already detected by an automated lint — ${lintFindings.length} such findings exist. Do NOT re-report mechanical tells; spend your entire budget on the judgment calls below.`
+    : `\nMechanical AI-tells are handled by an automated lint. Spend your entire budget on the judgment calls below.`;
+
+  return `You are a senior technical recruiter who screens hundreds of AI-written resumes every week. Your job is to find reasons to REJECT this resume before it wastes a hiring manager's time. You are skeptical by default: polished-but-hollow writing, too-perfect outcomes, and claims with no texture make you distrust a candidate.
+${lintNote}
+
+Evaluate the resume against the job description on exactly these criteria:
+${criteria}
+
+Report EVERY issue you find, including ones you are uncertain about or consider low-severity. Do not filter for importance — a downstream step does that. For each finding include your severity estimate so it can be ranked.
+
+Return ONLY a JSON object, no prose before or after, in exactly this shape:
+{
+  "verdict": {
+    "phone_screen": "yes" | "borderline" | "no",
+    "reason": "one blunt paragraph: would you phone-screen this candidate, and what specifically stops you"
+  },
+  "findings": [
+    {
+      "severity": "reject_risk" | "major" | "minor",
+      "criterion": "jd_alignment" | "fabrication_smell" | "seniority_voice" | "phone_screen_test",
+      "location": "where in the resume (e.g. experience[0].bullets[3], professional_summary)",
+      "quote": "the exact offending text, verbatim",
+      "message": "why a recruiter flags this",
+      "suggested_rewrite": "how to fix it, or empty string if the fix is structural"
+    }
+  ]
+}
+Maximum 15 findings, ordered most severe first.`;
+}
+
+function buildReviewerUserMessage(jd, resumeData) {
+  return `Here is the target job description:\n\n${jd}\n\n---\n\nHere is the resume, as structured JSON:\n\n${JSON.stringify(resumeData, null, 2)}\n\nReview it as the skeptical recruiter described. Return ONLY the JSON verdict object.`;
+}
+
+// System prompt for the fix pass — run by the ORIGINAL generator model so the
+// voice stays consistent. Resolves exactly the accepted findings, nothing else.
+function buildRevisePrompt(domain, len, includeCertifications) {
+  const base = len === "extended"
+    ? buildOptimizeSystemPromptExtended(domain, includeCertifications)
+    : len === "xl"
+      ? buildOptimizeSystemPromptXL(domain, includeCertifications)
+      : buildOptimizeSystemPrompt(domain, includeCertifications);
+  return `${base}
+
+REVISION MODE — SURGICAL FIXES ONLY:
+You are revising a resume you already wrote, to resolve a specific list of recruiter findings. Rules:
+- Fix EXACTLY the findings listed in the user message. Change nothing else.
+- Keep every company, title, date, and the overall voice identical.
+- A rewritten bullet must keep its factual claim unless the finding says the claim itself is implausible — then ground it (real baseline, believable figure, or remove the number).
+- Do not introduce new AI-tell vocabulary, em-dashes, or uniform bullet shapes while fixing.
+- Return the COMPLETE revised resume JSON in the same schema — not a diff, not only the changed parts.`;
+}
+
+function buildReviseUserMessage(jd, resumeData, findings) {
+  const list = (findings || []).map((f, i) =>
+    `${i + 1}. [${f.severity}] at ${f.location}: ${f.message}${f.quote ? `\n   Offending text: "${f.quote}"` : ""}${f.suggested_rewrite ? `\n   Suggested fix: ${f.suggested_rewrite}` : ""}`
+  ).join("\n");
+  return `Here is the target job description:\n\n${jd}\n\n---\n\nHere is the resume JSON you previously produced:\n\n${JSON.stringify(resumeData, null, 2)}\n\n---\n\nResolve exactly these recruiter findings:\n\n${list}\n\nReturn ONLY the complete revised resume JSON.`;
+}
+
 module.exports = {
   buildSystemPrompt,
   buildSystemPromptXL,
@@ -1013,6 +1084,10 @@ module.exports = {
   buildOptimizeSystemPromptExtended,
   buildOptimizeUserMessage,
   buildAntiSlopPromptSection,
+  buildReviewerPrompt,
+  buildReviewerUserMessage,
+  buildRevisePrompt,
+  buildReviseUserMessage,
   scoreResume,
   validateTimeline
 };
