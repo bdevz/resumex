@@ -80,7 +80,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(html);
   }
   if (req.method === "GET" && url === "/models") {
-    return send(res, 200, { default: "claude-opus-4.6", models: [{ alias: "claude-opus-4.6", id: "claude-opus-4-6", provider: "anthropic", label: "Claude Opus 4.6 (local)" }] });
+    return send(res, 200, { default: "gpt-5.6-sol", models: [{ alias: "gpt-5.6-sol", id: "gpt-5.6-sol", provider: "openai", label: "GPT-5.6 Sol (local)" }] });
   }
   if (req.method !== "POST") return send(res, 404, { error: "Not found" });
 

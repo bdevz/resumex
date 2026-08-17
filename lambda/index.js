@@ -149,7 +149,7 @@ function checkAdmin(headers) {
 }
 
 // Model registry: dropdown alias → { id, provider, label }
-const DEFAULT_MODEL_ALIAS = "claude-opus-4.6";
+const DEFAULT_MODEL_ALIAS = "gpt-5.6-sol";
 const MODELS = {
   // ── Anthropic ──
   // alwaysThinks: thinking is on by default and shares the max_tokens budget,
