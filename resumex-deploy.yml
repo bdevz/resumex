@@ -19,7 +19,7 @@ backend:
   source_dir: ./lambda
   handler: index.handler
   runtime: nodejs18.x
-  timeout: 300
+  timeout: 900
   memory: 512
   environment_variables:
     NODE_ENV: production

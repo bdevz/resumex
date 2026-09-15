@@ -954,6 +954,7 @@
           <label>Model</label>
           <select id="model-select">
             <optgroup label="Anthropic (Claude)">
+              <option value="claude-fable-5.1">Claude Fable 5.1</option>
               <option value="claude-fable-5">Claude Fable 5</option>
               <option value="claude-opus-5">Claude Opus 5</option>
               <option value="claude-opus-4.8">Claude Opus 4.8</option>
@@ -966,6 +967,7 @@
               <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
             </optgroup>
             <optgroup label="OpenAI (ChatGPT)">
+              <option value="gpt-6-astra">GPT-6 Astra</option>
               <option value="gpt-5.6-sol" selected>GPT-5.6 Sol</option>
               <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
               <option value="gpt-5.6-luna">GPT-5.6 Luna</option>
@@ -1138,6 +1140,9 @@
           <button class="btn-secondary" onclick="startOver()">Start Over</button>
         </div>
       </div>
+      <!-- Errors from the results view (review/revise) must be visible here:
+           #error-box lives inside the hidden #main-form after generation. -->
+      <div class="error-box" id="results-error-box"></div>
 
       <!-- Meta -->
       <div class="section">
@@ -1878,7 +1883,7 @@
     }
 
     async function pollForResult(jobId) {
-      var maxAttempts = 90; // 90 * 3s = 4.5 minutes max (Lambda timeout is 5 min)
+      var maxAttempts = 280; // 280 * 3s = 14 min (Lambda timeout 15 min; slow thinking models like Fable need the room)
       var networkErrors = 0;
       for (var i = 0; i < maxAttempts; i++) {
         await new Promise(function(r) { setTimeout(r, 3000); });
@@ -2340,13 +2345,19 @@
 
     // ── Errors ──
     function showError(msg) {
-      const el = document.getElementById("error-box");
-      el.textContent = msg;
-      el.style.display = "block";
+      // Write to both error boxes: the form one (visible pre-generation) and
+      // the results one (visible once #main-form is hidden after generation).
+      for (const id of ["error-box", "results-error-box"]) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.style.display = "block";
+      }
     }
 
     function hideError() {
-      document.getElementById("error-box").style.display = "none";
+      for (const id of ["error-box", "results-error-box"]) {
+        document.getElementById(id).style.display = "none";
+      }
     }
   </script>
 </body>
