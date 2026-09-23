@@ -265,14 +265,17 @@ function createExperienceSection(experience, tmpl, colorOverride) {
       const bulletOpts = {
         children: [
           new TextRun({
-            text: `\u2022 ${bullet}`,
+            text: `\u2022\t${bullet}`,
             font: fBody.face,
             size: fBody.size,
             color: textColor,
           }),
         ],
         spacing: { after: 60 },
-        indent: { left: 360 },
+        // Shared hanging indent: wrapped lines align with the bullet text,
+        // not with the bullet glyph. Same grid for every experience role.
+        indent: { left: 360, hanging: 240 },
+        tabStops: [{ type: TabStopType.LEFT, position: 360 }],
       };
 
       if (tmpl.id === "timeline") {
@@ -284,7 +287,8 @@ function createExperienceSection(experience, tmpl, colorOverride) {
             space: 8,
           },
         };
-        bulletOpts.indent = { left: 480 };
+        bulletOpts.indent = { left: 480, hanging: 240 };
+        bulletOpts.tabStops = [{ type: TabStopType.LEFT, position: 480 }];
       }
 
       paragraphs.push(new Paragraph(bulletOpts));
@@ -716,8 +720,9 @@ function createProjectsSection(projects, tmpl, colorOverride) {
     }
     for (const b of p.bullets || []) {
       out.push(new Paragraph({
-        children: [new TextRun({ text: `• ${b}`, font: fBody.face, size: fBody.size, color: textColor })],
-        spacing: { after: 60 }, indent: { left: 360 },
+        children: [new TextRun({ text: `•\t${b}`, font: fBody.face, size: fBody.size, color: textColor })],
+        spacing: { after: 60 }, indent: { left: 360, hanging: 240 },
+        tabStops: [{ type: TabStopType.LEFT, position: 360 }],
       }));
     }
   }

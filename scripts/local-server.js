@@ -80,7 +80,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(html);
   }
   if (req.method === "GET" && url === "/models") {
-    return send(res, 200, { default: "gpt-5.6-sol", models: [{ alias: "gpt-5.6-sol", id: "gpt-5.6-sol", provider: "openai", label: "GPT-5.6 Sol (local)" }] });
+    return send(res, 200, { default: "gpt-6-sol", models: [{ alias: "gpt-6-sol", id: "gpt-6-sol", provider: "openai", label: "GPT-6 Sol (local)" }] });
   }
   if (req.method !== "POST") return send(res, 404, { error: "Not found" });
 

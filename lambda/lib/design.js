@@ -325,7 +325,7 @@ function composeDesign(seed, overrides = {}) {
     typography,
     layout,
     headerStyle,
-    density: "extended",
+    density: "standard",
     // Default compose stays strictly ATS-safe: no tables (skill bands /
     // callout), no icons, no headshot. Only paragraph-border dividers vary.
     // The richer elements remain available via explicit customization.

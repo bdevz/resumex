@@ -147,7 +147,7 @@ describe("buildAntiSlopPromptSection()", () => {
 
   it("includes metric ratio for the given mode", () => {
     const standard = buildAntiSlopPromptSection("standard");
-    assert.ok(standard.includes("6-8"), "standard mode should reference 6-8 bullets");
+    assert.ok(standard.includes("4-6"), "standard mode should reference 4-6 bullets");
 
     const xl = buildAntiSlopPromptSection("xl");
     assert.ok(xl.includes("10-15"), "xl mode should reference 10-15 bullets");
@@ -244,7 +244,7 @@ describe("buildOptimizeSystemPrompt() anti-slop integration", () => {
   });
 
   it("uses optimize metric ratio", () => {
-    assert.ok(prompt.includes("6-8"));
+    assert.ok(prompt.includes("4-6"));
   });
 
   it("no longer contains old hardcoded adverb guidance", () => {

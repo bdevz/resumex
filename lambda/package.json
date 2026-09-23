@@ -4,6 +4,8 @@
   "description": "Lambda function for Resume Generator",
   "main": "index.js",
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
     "docx": "^8.0.0"
   },
   "engines": {

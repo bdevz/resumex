@@ -121,8 +121,8 @@ describe("single-column is the ATS-safe default", () => {
     }
   });
 
-  it("composed default targets a 4-5 page (extended) design", () => {
-    assert.equal(composeDesign("x").density, "extended");
+  it("composed default targets a readable standard design", () => {
+    assert.equal(composeDesign("x").density, "standard");
   });
 
   it("each single variant maps to a header treatment + alignment", () => {

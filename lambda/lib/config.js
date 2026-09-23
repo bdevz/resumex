@@ -104,7 +104,7 @@ const FORMAT = {
     "education",
     "certifications",
   ],
-  bullets_per_role: { min: 6, max: 8 },
+  bullets_per_role: { min: 4, max: 6 },
   max_pages: 2,
   // Right tab stop position for date alignment (content width)
   right_tab: 10080, // 12240 - 1080 - 1080 = 10080 DXA
@@ -514,9 +514,9 @@ A human resume has personality — it mentions the annoying migration, the team 
 Never make every bullet sound triumphant. Real work is messy.`,
 
   max_metric_ratio: {
-    standard:      { max: 4, per: "6-8",   description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    standard:      { max: 3, per: "4-6",   description: "Only use verified metrics; at most 3 of 4-6 bullets per role need numbers" },
     xl:            { max: 5, per: "10-15",  description: "At most 5 of 10-15 bullets per role should have hard metrics" },
-    optimize:      { max: 4, per: "6-8",    description: "At most 4 of 6-8 bullets per role should have hard metrics" },
+    optimize:      { max: 3, per: "4-6",    description: "Only use verified metrics; at most 3 of 4-6 bullets per role need numbers" },
     "optimize-xl": { max: 7, per: "10-15",  description: "At most 5-7 of 10-15 bullets per role should have hard metrics" },
     extended:            { max: 12, per: "18-26", description: "At most 9-12 of 18-26 bullets per role should have hard metrics" },
     "optimize-extended": { max: 12, per: "18-26", description: "At most 9-12 of 18-26 bullets per role should have hard metrics" },

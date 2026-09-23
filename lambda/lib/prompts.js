@@ -72,7 +72,7 @@ WORK HISTORY GUIDELINES:
 - Previous roles: 18-28 months each
 - Include 1-2 IT services companies (${c.IT_SERVICES_FIRMS.slice(0, 3).join(", ")})
 - Use competitor companies from the target industry
-- Each role should have 6-8 bullets
+- Select 4-6 distinct, relevant achievement bullets per role; fewer for older or less relevant roles
 - The resume can span up to 2 pages
 - Timeline must be realistic (no gaps, no overlaps)
 
@@ -108,7 +108,7 @@ COMPANY & DOMAIN CONTEXT:
 - When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
   generate domain-appropriate content without referencing a specific employer
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
-  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+  in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
@@ -119,7 +119,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts before the 
 function buildSystemPromptXL(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume generator that creates keyword-heavy, ATS-optimized resumes using the Google XYZ formula. Your goal is to produce a dense, 3-page resume where EVERY bullet scores 5+ out of 7 on quality.
+  return `You are a resume generator that creates keyword-heavy, ATS-optimized resumes using the Google XYZ formula. Your goal is to produce a dense, 3-page resume while prioritizing readable, non-repetitive accomplishments.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -186,7 +186,7 @@ The first 3 bullets of each role are the ONLY ones most hiring managers will rea
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
 - Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
 - Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
-- Bullet 3: a strong technical achievement with clear metrics
+- Bullet 3: a technical achievement with a verified result, quantitative only when evidenced
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
@@ -210,7 +210,7 @@ COMPANY & DOMAIN CONTEXT:
 - When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
   generate domain-appropriate content without referencing a specific employer
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
-  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+  in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
@@ -221,7 +221,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or 
 function buildSystemPromptExtended(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume generator that creates keyword-heavy, ATS-optimized, design-forward resumes using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages where EVERY bullet scores 5+ out of 7 on quality. This is NOT a one-pager — depth and breadth are expected.
+  return `You are a resume generator that creates keyword-heavy, ATS-optimized, design-forward resumes using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages while prioritizing readable, non-repetitive accomplishments. This is NOT a one-pager — depth and breadth are expected.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -296,7 +296,7 @@ The first 3 bullets of each role are the ONLY ones most hiring managers will rea
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
 - Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
 - Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
-- Bullet 3: a strong technical achievement with clear metrics
+- Bullet 3: a technical achievement with a verified result, quantitative only when evidenced
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
@@ -325,7 +325,7 @@ COMPANY & DOMAIN CONTEXT:
 - When a domain keyword is provided instead of a company name (e.g., "Fintech" instead of "Capital One"),
   generate domain-appropriate content without referencing a specific employer
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
-  in realistic scenarios. Embellish with metrics and JD keywords, but keep the core work accurate.
+  in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
 TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
 ${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
@@ -586,7 +586,7 @@ CRITICAL RULES:
 5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
 6. EXTRACT education details (schools, degrees, dates, locations) from the resume
 7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
-8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
+8. Use a metric only if it is explicitly supported by the original resume. Never invent a number, credential, tool, employer, project, or result to match the JD
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role
 11. REORDER technical skills to prioritize what the JD asks for
@@ -634,8 +634,8 @@ Use these SHORT KEYS in your JSON response (saves tokens):
       "sd": "MMM YYYY from resume",
       "ed": "MMM YYYY from resume",
       "b": [
-        "Rewritten XYZ formula bullet with metrics and JD keywords",
-        "Another rewritten bullet with specific quantified results"
+        "Rewritten bullet using only achievements and metrics present in the original",
+        "Another rewritten bullet with a verified result or clear qualitative impact"
       ]
     }
   ]${cert.schemaLine}
@@ -643,10 +643,10 @@ Use these SHORT KEYS in your JSON response (saves tokens):
 ${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
-- Each role should have 6-8 bullets
+- Select 4-6 distinct, relevant achievement bullets per role; fewer for older or less relevant roles
 - Do NOT end bullet points with periods
 - Keep bullets to 1-2 lines (under 200 characters)
-- If the original bullet lacks a metric, add a realistic one based on context — but NOT every bullet needs a number
+- If the original lacks a metric, keep the result qualitative. Do not estimate, invent, or imply an unsupported metric
 - Prioritize technologies mentioned in the JD
 - For skills section: include ALL technologies from the original resume, but list JD-relevant ones first
 - If contact fields are not found in the resume, use empty strings
@@ -674,7 +674,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts before the 
 function buildOptimizeSystemPromptXL(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized for a specific job description using the Google XYZ formula. Your goal is a dense 3-page resume where EVERY bullet scores 5+ out of 7 on quality.
+  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized for a specific job description using the Google XYZ formula. Your goal is a dense 3-page resume while prioritizing readable, non-repetitive accomplishments.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -684,7 +684,7 @@ CRITICAL RULES:
 5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
 6. EXTRACT education details (schools, degrees, dates, locations) from the resume
 7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
-8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
+8. Use a metric only if it is explicitly supported by the original resume. Never invent a number, credential, tool, employer, project, or result to match the JD
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role — make it 5-8 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
@@ -732,7 +732,7 @@ Use these SHORT KEYS in your JSON response (saves tokens):
       "sd": "MMM YYYY from resume",
       "ed": "MMM YYYY from resume",
       "b": [
-        "Rewritten XYZ bullet with technology name AND metric scoring 5+/7",
+        "Rewritten achievement with a verified result and relevant technology",
         "Another rewritten bullet with specific framework AND percentage"
       ]
     }
@@ -742,7 +742,7 @@ ${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 10-15 detailed bullets
-- If original has fewer than 10 bullets per role, ADD more bullets with JD keywords
+- Do not add bullets solely to reach a count or insert unverified JD keywords
 - Do NOT end bullet points with periods
 - Keep bullets under 250 characters
 - Prioritize technologies mentioned in the JD
@@ -756,7 +756,7 @@ Place the strongest rewritten bullets FIRST in each role.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
 - Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
 - Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
-- Bullet 3: a strong technical achievement with clear metrics
+- Bullet 3: a technical achievement with a verified result, quantitative only when evidenced
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
@@ -774,7 +774,7 @@ CRITICAL: Check EVERY bullet against this timeline. If a role starts before the 
 function buildOptimizeSystemPromptExtended(domain, includeCertifications) {
   const c = resolveDomain(domain);
   const cert = certSchema(c, includeCertifications);
-  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized, design-forward for a specific job description using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages where EVERY bullet scores 5+ out of 7 on quality. Never produce a one-pager.
+  return `You are a resume optimizer that rewrites existing resumes to be keyword-heavy, ATS-optimized, design-forward for a specific job description using the Google XYZ formula. Your goal is a dense resume spanning MINIMUM 4 pages and UP TO 5 pages while prioritizing readable, non-repetitive accomplishments. Never produce a one-pager.
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations, no extra text
@@ -784,7 +784,7 @@ CRITICAL RULES:
 5. EXTRACT contact info (name, email, phone, linkedin, github) from the resume
 6. EXTRACT education details (schools, degrees, dates, locations) from the resume
 7. REWRITE bullet points to highlight achievements — mix XYZ, CAR, and natural sentence structures
-8. ADD quantifiable metrics to most bullets, but not ALL — see WRITING STYLE below
+8. Use a metric only if it is explicitly supported by the original resume. Never invent a number, credential, tool, employer, project, or result to match the JD
 9. WEAVE IN missing keywords and technologies from the job description naturally into bullets
 10. OPTIMIZE the professional summary for the target role — make it 7-10 sentences packed with keywords
 11. REORDER technical skills to prioritize what the JD asks for
@@ -832,7 +832,7 @@ Use these SHORT KEYS in your JSON response (saves tokens):
       "sd": "MMM YYYY from resume",
       "ed": "MMM YYYY from resume",
       "b": [
-        "Rewritten XYZ bullet with technology name AND metric scoring 5+/7",
+        "Rewritten achievement with a verified result and relevant technology",
         "Another rewritten bullet with specific framework AND percentage"
       ]
     }
@@ -849,7 +849,7 @@ ${cert.instruction}${domainContextBlock(c)}
 OPTIMIZATION RULES:
 - Keep the SAME number of jobs and same career structure
 - Each role should have 18-26 detailed bullets
-- If original has fewer than 14 bullets per role, EXPAND with JD-relevant achievements grounded in the role's real scope (do NOT fabricate employers, titles, or dates)
+- Do not expand the role with achievements or technologies absent from the original resume
 - The resume MUST reach at least 4 pages and may extend to 5 — never shorter
 - Only include a "projects" array if the original resume describes projects; rewrite them with JD keywords. Do NOT invent projects.
 - Do NOT end bullet points with periods
@@ -865,7 +865,7 @@ Place the strongest rewritten bullets FIRST in each role.
 - Bullets 1-2 MUST be the strongest: show SCOPE, IMPACT, and LEADERSHIP
 - Bullet 1 answers "what is the biggest thing this person did here?" — scale, transformation, revenue
 - Bullet 2 answers "what business problem did they solve?" — compliance, cost, reliability, customer satisfaction
-- Bullet 3: a strong technical achievement with clear metrics
+- Bullet 3: a technical achievement with a verified result, quantitative only when evidenced
 - Bullets 4+: technical depth, architecture, tooling, mentoring, process improvements
 
 BUSINESS VALUE MIX (per role):
@@ -888,7 +888,7 @@ function buildOptimizeUserMessage(resume, jd, context) {
     message += `\n\nAdditional instructions: ${context}`;
   }
 
-  message += `\n\nOptimize the resume for this job description. Preserve all real companies, titles, and dates. Rewrite bullets with metrics and JD keywords. Return ONLY the JSON response.`;
+  message += `\n\nOptimize the resume for this job description. Preserve all real companies, titles, and dates. Rewrite bullets with supported results and JD-relevant skills already evidenced in the resume. Never invent numbers or skills. Return ONLY the JSON response.`;
 
   return message;
 }

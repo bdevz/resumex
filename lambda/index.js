@@ -149,12 +149,13 @@ function checkAdmin(headers) {
 }
 
 // Model registry: dropdown alias → { id, provider, label }
-const DEFAULT_MODEL_ALIAS = "gpt-5.6-sol";
+const DEFAULT_MODEL_ALIAS = "gpt-6-sol";
 const MODELS = {
   // ── Anthropic ──
   // alwaysThinks: thinking is on by default and shares the max_tokens budget,
   // so those models get extra output headroom in callLLM/stream.
   "claude-fable-5":    { id: "claude-fable-5",              provider: "anthropic", label: "Claude Fable 5",   alwaysThinks: true },
+  "claude-opus-5.5":   { id: "claude-opus-5-5",             provider: "anthropic", label: "Claude Opus 5.5",  alwaysThinks: true },
   "claude-opus-5":     { id: "claude-opus-5",               provider: "anthropic", label: "Claude Opus 5",    alwaysThinks: true },
   "claude-opus-4.8":   { id: "claude-opus-4-8",            provider: "anthropic", label: "Claude Opus 4.8" },
   "claude-opus-4.7":   { id: "claude-opus-4-7",            provider: "anthropic", label: "Claude Opus 4.7" },
@@ -165,6 +166,8 @@ const MODELS = {
   "claude-sonnet-4.5": { id: "claude-sonnet-4-5-20250929", provider: "anthropic", label: "Claude Sonnet 4.5" },
   "claude-haiku-4.5":  { id: "claude-haiku-4-5-20251001",  provider: "anthropic", label: "Claude Haiku 4.5" },
   // ── OpenAI ──
+  "gpt-6-sol":     { id: "gpt-6-sol",     provider: "openai", label: "GPT-6 Sol" },
+  "gpt-6-luna":    { id: "gpt-6-luna",    provider: "openai", label: "GPT-6 Luna" },
   "gpt-5.6-sol":   { id: "gpt-5.6-sol",   provider: "openai", label: "GPT-5.6 Sol" },
   "gpt-5.6-terra": { id: "gpt-5.6-terra", provider: "openai", label: "GPT-5.6 Terra" },
   "gpt-5.6-luna":  { id: "gpt-5.6-luna",  provider: "openai", label: "GPT-5.6 Luna" },
@@ -234,7 +237,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
       status: 504,
       isTimeout,
       error: isTimeout
-        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-5.6 Luna) or disable XL mode."
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-6 Luna) or choose Standard length."
         : `Network error calling LLM API: ${fetchErr.message}`,
     };
   }
@@ -566,7 +569,7 @@ function handleModels() {
 
 // ── Streaming handler (for Lambda Function URL with RESPONSE_STREAM) ──
 
-if (typeof awslambda !== "undefined") {
+if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "function") {
   exports.streamHandler = awslambda.streamifyResponse(async (event, responseStream, _context) => {
     const method = getMethod(event);
     const path = getPath(event);
@@ -895,9 +898,27 @@ exports.handler = async (event) => {
           details: resultBody.details || resultBody.raw_preview || undefined,
         });
       } else {
+        // Persist first, then report completion so the UI can distinguish an
+        // applied revision from one actually saved to My History.
+        let historySaved = false;
+        if (route !== "review") {
+          try {
+            await writeHistory(buildHistoryRecord({
+              id: jobId,
+              userName: body.__userName,
+              createdAt: new Date().toISOString(),
+              body,
+              resultBody: { ...resultBody, mode: resultBody.mode || (route === "optimize" ? "optimize" : "generate") },
+            }));
+            historySaved = true;
+          } catch (histErr) {
+            console.error("History write failed (non-fatal):", histErr);
+          }
+        }
         // Success — write result without spreading (avoids status field collision)
         await writeJobResult(jobId, {
           status: "complete",
+          historySaved,
           resumeData: resultBody.resumeData,
           scoring: resultBody.scoring,
           timeline_warnings: resultBody.timeline_warnings,
@@ -911,22 +932,6 @@ exports.handler = async (event) => {
           mode: resultBody.mode,
         });
 
-        // Save to per-user history. Best-effort: a failure here must never
-        // affect the generated resume the user is waiting on.
-        // Reviews produce no resume — nothing to save; revised resumes save
-        // as new entries through this same path.
-        if (route === "review") return response(200, { ok: true });
-        try {
-          await writeHistory(buildHistoryRecord({
-            id: jobId,
-            userName: body.__userName,
-            createdAt: new Date().toISOString(),
-            body,
-            resultBody: { ...resultBody, mode: resultBody.mode || (route === "optimize" ? "optimize" : "generate") },
-          }));
-        } catch (histErr) {
-          console.error("History write failed (non-fatal):", histErr);
-        }
       }
     } catch (err) {
       console.error("Async job error:", err);
