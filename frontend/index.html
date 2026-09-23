@@ -1927,8 +1927,9 @@
     }
 
     async function pollForResult(jobId) {
-      var maxAttempts = 280; // 280 * 3s = 14 min (Lambda timeout 15 min; slow thinking models like Fable need the room)
+      var maxAttempts = 305; // >15 min, so near-ceiling jobs can publish their final status
       var networkErrors = 0;
+      var historyPendingChecks = 0;
       for (var i = 0; i < maxAttempts; i++) {
         await new Promise(function(r) { setTimeout(r, 3000); });
         try {
@@ -1939,7 +1940,10 @@
           });
           if (!resp.ok) continue;
           var data = await resp.json();
-          if (data.status === "complete") return data;
+          if (data.status === "complete") {
+            if (data.historyStatus === "pending" && ++historyPendingChecks < 4) continue;
+            return data;
+          }
           if (data.status === "error") {
             var msg = data.error || "Job failed.";
             if (data.details) msg += " Details: " + (typeof data.details === "string" ? data.details.substring(0, 200) : JSON.stringify(data.details).substring(0, 200));
@@ -1971,7 +1975,7 @@
       const metaGrid = document.getElementById("meta-grid");
       metaGrid.innerHTML = "";
       const metaItems = [
-        ["Mode", data.mode === "optimize" ? "Optimized" : "Generated"],
+        ["Mode", data.mode === "revise" ? "Revised" : data.mode === "optimize" ? "Optimized" : "Generated"],
         ["Role", pjd.role_title || "—"],
         ["Industry", pjd.industry || "—"],
         ["Cloud", (pjd.cloud_platform || "—").toUpperCase()],

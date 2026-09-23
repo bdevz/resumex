@@ -1,7 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const JSZip = require('jszip');
-const { handler } = require('../../index');
+const { handler, _readAnthropicStream } = require('../../index');
 const { buildResume } = require('../docx-builder');
 const { buildOptimizeSystemPrompt, buildRevisePrompt } = require('../prompts');
 const { composeDesign } = require('../design');
@@ -17,6 +17,32 @@ describe('human-readable ResumeX release', () => {
     assert.equal(byAlias['gpt-6-luna'].id, 'gpt-6-luna');
     assert.equal(byAlias['claude-opus-5.5'].id, 'claude-opus-5-5');
     assert.ok(byAlias['claude-fable-5.1'] && byAlias['gpt-6-astra'], 'preserve existing production options');
+  });
+
+  it('collects text from chunked Anthropic SSE without leaking hidden thinking', async () => {
+    const events = [
+      { type: 'message_start', message: { model: 'claude-opus-5-5', usage: { input_tokens: 25 } } },
+      { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'internal' } },
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: '{"exp":' } },
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: '[]}' } },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 10 } },
+    ];
+    const wire = events.map(e => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+    const bytes = new TextEncoder().encode(wire);
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 37));
+        controller.enqueue(bytes.slice(37, 101));
+        controller.enqueue(bytes.slice(101));
+        controller.close();
+      },
+    });
+    const result = await _readAnthropicStream({ body: stream });
+    assert.equal(result.content[0].text, '{"exp":[]}');
+    assert.equal(result.model, 'claude-opus-5-5');
+    assert.equal(result.usage.input_tokens, 25);
+    assert.equal(result.usage.output_tokens, 10);
+    assert.equal(result.stop_reason, 'end_turn');
   });
 
   it('keeps optimization grounded in supplied experience rather than inventing metrics', () => {

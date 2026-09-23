@@ -189,6 +189,46 @@ function modelInfo(modelInput) {
   return { alias: DEFAULT_MODEL_ALIAS, ...MODELS[DEFAULT_MODEL_ALIAS] };
 }
 
+// Collect the text blocks of Anthropic's SSE response. Long thinking-model
+// requests must stream: a non-streaming HTTP response can hit provider timeouts
+// before a large complete resume is returned.
+async function readAnthropicStream(apiResponse) {
+  const reader = apiResponse.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", text = "", model = null, usage = {}, stopReason = null;
+  const accept = (line) => {
+    if (!line.startsWith("data: ")) return;
+    const raw = line.slice(6).trim();
+    if (!raw || raw === "[DONE]") return;
+    const event = JSON.parse(raw);
+    if (event.type === "error") throw new Error(event.error?.message || "Anthropic stream error");
+    if (event.type === "message_start") {
+      model = event.message?.model || model;
+      usage = { ...usage, ...(event.message?.usage || {}) };
+    }
+    if (event.type === "content_block_start" && event.content_block?.type === "text") text += event.content_block.text || "";
+    if (event.type === "content_block_delta" && event.delta?.type === "text_delta") text += event.delta.text || "";
+    if (event.type === "message_delta") {
+      stopReason = event.delta?.stop_reason || stopReason;
+      usage = { ...usage, ...(event.usage || {}) };
+    }
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop();
+    for (const line of lines) accept(line);
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) accept(buffer.trim());
+  return { content: [{ type: "text", text }], model, usage, stop_reason: stopReason };
+}
+
+// Internal pure stream parser is exported for a deterministic protocol test.
+exports._readAnthropicStream = readAnthropicStream;
+
 // Unified LLM call. Returns { ok:true, text, modelUsed, usage }
 // or { ok:false, status, error, details, isTimeout }.
 async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeoutMs = 840_000) {
@@ -230,6 +270,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeout
           model: m.id,
           // alwaysThinks models spend part of max_tokens on thinking
           max_tokens: m.alwaysThinks ? maxTokens + 16384 : maxTokens,
+          stream: !!m.alwaysThinks,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -259,7 +300,15 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeout
     return { ok: false, status: apiResponse.status, error: friendly, details: errText };
   }
 
-  const data = await apiResponse.json();
+  let data;
+  try {
+    data = m.provider === "anthropic" && m.alwaysThinks
+      ? await readAnthropicStream(apiResponse)
+      : await apiResponse.json();
+  } catch (err) {
+    console.error(`${m.provider} response failed:`, err.message);
+    return { ok: false, status: 502, error: "The model response was interrupted. Try again." };
+  }
 
   if (m.provider === "openai") {
     if (data.error) {
@@ -924,10 +973,25 @@ exports.handler = async (event) => {
           details: resultBody.details || resultBody.raw_preview || undefined,
         });
       } else {
-        // Persist first, then report completion so the UI can distinguish an
-        // applied revision from one actually saved to My History.
-        let historySaved = false;
+        // Publish the generated result *before* the best-effort history write.
+        // If history stalls or the Lambda times out, the resume remains
+        // retrievable. The client gives persistence a short grace period.
+        const completed = {
+          status: "complete",
+          resumeData: resultBody.resumeData,
+          scoring: resultBody.scoring,
+          timeline_warnings: resultBody.timeline_warnings,
+          lint: resultBody.lint,
+          reviewer_model: resultBody.reviewer_model,
+          verdict: resultBody.verdict,
+          findings: resultBody.findings,
+          model_used: resultBody.model_used,
+          usage: resultBody.usage,
+          mode: resultBody.mode,
+        };
+        await writeJobResult(jobId, { ...completed, historySaved: false, historyStatus: route === "review" ? "not_applicable" : "pending" });
         if (route !== "review") {
+          let historySaved = false;
           try {
             await writeHistory(buildHistoryRecord({
               id: jobId,
@@ -940,23 +1004,14 @@ exports.handler = async (event) => {
           } catch (histErr) {
             console.error("History write failed (non-fatal):", histErr);
           }
+          try {
+            await writeJobResult(jobId, { ...completed, historySaved, historyStatus: historySaved ? "saved" : "failed" });
+          } catch (statusErr) {
+            // The first completed result is still durable; do not replace it
+            // with an error if the optional status update fails.
+            console.error("History status update failed:", statusErr);
+          }
         }
-        // Success — write result without spreading (avoids status field collision)
-        await writeJobResult(jobId, {
-          status: "complete",
-          historySaved,
-          resumeData: resultBody.resumeData,
-          scoring: resultBody.scoring,
-          timeline_warnings: resultBody.timeline_warnings,
-          lint: resultBody.lint,
-          // review-route fields (undefined on other routes, dropped by JSON)
-          reviewer_model: resultBody.reviewer_model,
-          verdict: resultBody.verdict,
-          findings: resultBody.findings,
-          model_used: resultBody.model_used,
-          usage: resultBody.usage,
-          mode: resultBody.mode,
-        });
 
       }
     } catch (err) {
