@@ -875,7 +875,7 @@
     <!-- Header -->
     <header>
       <h1>ResumeX</h1>
-      <p>ATS-optimized resumes with Google XYZ formula bullets</p>
+      <p>Clear, tailored resumes built for human readers</p>
     </header>
 
     <!-- Auth -->
@@ -935,6 +935,7 @@
         <button class="mode-tab active" id="tab-optimize" onclick="setMode('optimize')">Optimize Mine</button>
         <button class="mode-tab" id="tab-generate" onclick="setMode('generate')">Generate New</button>
       </div>
+      <p class="field-hint" id="mode-hint" style="margin:-16px 0 22px;">Optimize uses your existing experience. Check every fact before applying.</p>
 
       <!-- Resume input (optimize mode only) -->
       <div class="field-group" id="resume-field">
@@ -965,6 +966,7 @@
           <label>Model</label>
           <select id="model-select">
             <optgroup label="Anthropic (Claude)">
+              <option value="claude-fable-5.1">Claude Fable 5.1</option>
               <option value="claude-fable-5">Claude Fable 5</option>
               <option value="claude-opus-5.5">Claude Opus 5.5 (new)</option>
               <option value="claude-opus-5">Claude Opus 5</option>
@@ -979,6 +981,7 @@
             </optgroup>
             <optgroup label="OpenAI (ChatGPT)">
               <option value="gpt-6-sol" selected>GPT-6 Sol · recommended</option>
+              <option value="gpt-6-astra">GPT-6 Astra (advanced)</option>
               <option value="gpt-6-luna">GPT-6 Luna (fast)</option>
               <option value="gpt-5.6-sol">GPT-5.6 Sol</option>
               <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
@@ -1139,7 +1142,7 @@
         </div>
         <div class="progress-phase" data-phase="4">
           <div class="phase-icon"></div>
-          <span>Scoring bullet quality</span>
+          <span>Checking readability</span>
         </div>
       </div>
       <div class="progress-bar-outer">
@@ -1158,6 +1161,9 @@
           <button class="btn-secondary" onclick="startOver()">Start Over</button>
         </div>
       </div>
+      <!-- Errors from the results view (review/revise) must be visible here:
+           #error-box lives inside the hidden #main-form after generation. -->
+      <div class="error-box" id="results-error-box"></div>
 
       <!-- Meta -->
       <div class="section">
@@ -1618,6 +1624,9 @@
     // ── Mode switching ──
     function setMode(mode) {
       currentMode = mode;
+      document.getElementById("mode-hint").textContent = mode === "generate"
+        ? "Illustrative draft only: generated employers, accomplishments, and metrics are not verified. Replace them with your real history before use."
+        : "Optimize uses your existing experience. Check every fact before applying.";
       document.getElementById("tab-optimize").classList.toggle("active", mode === "optimize");
       document.getElementById("tab-generate").classList.toggle("active", mode === "generate");
       document.getElementById("resume-field").style.display = mode === "optimize" ? "block" : "none";
@@ -1918,7 +1927,7 @@
     }
 
     async function pollForResult(jobId) {
-      var maxAttempts = 90; // 90 * 3s = 4.5 minutes max (Lambda timeout is 5 min)
+      var maxAttempts = 280; // 280 * 3s = 14 min (Lambda timeout 15 min; slow thinking models like Fable need the room)
       var networkErrors = 0;
       for (var i = 0; i < maxAttempts; i++) {
         await new Promise(function(r) { setTimeout(r, 3000); });
@@ -1955,7 +1964,7 @@
       notice.classList.remove("warn");
 
       // Update title based on mode
-      document.getElementById("results-title").textContent = data.mode === "optimize" ? "Optimized Resume" : "Generated Resume";
+      document.getElementById("results-title").textContent = data.mode === "revise" ? "Revised Resume" : data.mode === "optimize" ? "Optimized Resume" : "Generated Resume";
 
       // Meta
       const pjd = resumeData.parsed_jd || {};
@@ -2425,13 +2434,19 @@
 
     // ── Errors ──
     function showError(msg) {
-      const el = document.getElementById("error-box");
-      el.textContent = msg;
-      el.style.display = "block";
+      // Write to both error boxes: the form one (visible pre-generation) and
+      // the results one (visible once #main-form is hidden after generation).
+      for (const id of ["error-box", "results-error-box"]) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.style.display = "block";
+      }
     }
 
     function hideError() {
-      document.getElementById("error-box").style.display = "none";
+      for (const id of ["error-box", "results-error-box"]) {
+        document.getElementById(id).style.display = "none";
+      }
     }
   </script>
 </body>

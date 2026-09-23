@@ -154,6 +154,7 @@ const MODELS = {
   // ── Anthropic ──
   // alwaysThinks: thinking is on by default and shares the max_tokens budget,
   // so those models get extra output headroom in callLLM/stream.
+  "claude-fable-5.1":  { id: "claude-fable-5-1", provider: "anthropic", label: "Claude Fable 5.1", alwaysThinks: true },
   "claude-fable-5":    { id: "claude-fable-5",              provider: "anthropic", label: "Claude Fable 5",   alwaysThinks: true },
   "claude-opus-5.5":   { id: "claude-opus-5-5",             provider: "anthropic", label: "Claude Opus 5.5",  alwaysThinks: true },
   "claude-opus-5":     { id: "claude-opus-5",               provider: "anthropic", label: "Claude Opus 5",    alwaysThinks: true },
@@ -166,6 +167,7 @@ const MODELS = {
   "claude-sonnet-4.5": { id: "claude-sonnet-4-5-20250929", provider: "anthropic", label: "Claude Sonnet 4.5" },
   "claude-haiku-4.5":  { id: "claude-haiku-4-5-20251001",  provider: "anthropic", label: "Claude Haiku 4.5" },
   // ── OpenAI ──
+  "gpt-6-astra":   { id: "gpt-6-astra", provider: "openai", label: "GPT-6 Astra" },
   "gpt-6-sol":     { id: "gpt-6-sol",     provider: "openai", label: "GPT-6 Sol" },
   "gpt-6-luna":    { id: "gpt-6-luna",    provider: "openai", label: "GPT-6 Luna" },
   "gpt-5.6-sol":   { id: "gpt-5.6-sol",   provider: "openai", label: "GPT-5.6 Sol" },
@@ -189,14 +191,18 @@ function modelInfo(modelInput) {
 
 // Unified LLM call. Returns { ok:true, text, modelUsed, usage }
 // or { ok:false, status, error, details, isTimeout }.
-async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
+async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeoutMs = 840_000) {
   const m = modelInfo(modelInput);
   let apiResponse;
   try {
     if (m.provider === "openai") {
       apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        signal: AbortSignal.timeout(240_000),
+        // Slow thinking models (Fable 5/5.1 at high effort) can run for many
+        // minutes; the async-job pattern keeps the client off this call, so
+        // the only ceiling is the Lambda timeout (900s) minus result-write
+        // time. 840s leaves a minute of margin.
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -214,7 +220,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
     } else {
       apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        signal: AbortSignal.timeout(240_000),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           "Content-Type": "application/json",
           "x-api-key": process.env.ANTHROPIC_API_KEY,
@@ -223,7 +229,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
         body: JSON.stringify({
           model: m.id,
           // alwaysThinks models spend part of max_tokens on thinking
-          max_tokens: m.alwaysThinks ? maxTokens + 8192 : maxTokens,
+          max_tokens: m.alwaysThinks ? maxTokens + 16384 : maxTokens,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -503,22 +509,42 @@ async function handleRevise(body) {
   const dom = domain || "software";
   const len = resolveLength(body);
 
-  const r = await callLLM(
-    modelInput,
-    buildRevisePrompt(dom, len, includeCertifications),
-    buildReviseUserMessage(jd, resumeData, findings),
-    maxTokensFor(len)
-  );
+  // The revise pass must return the COMPLETE resume JSON, and reasoning models
+  // spend part of the completion budget on hidden reasoning tokens — at the
+  // plain generation budget this truncated in practice. Add headroom and
+  // retry once on truncation/invalid JSON (often stochastic).
+  const reviseBudget = maxTokensFor(len) + 8192;
+  // A second call must never get another full 840 seconds inside a 900-second
+  // Lambda. Leave time for S3 result/history writes even after a slow first call.
+  const deadline = Date.now() + 820_000;
+  const attempt = (maxTokens) => {
+    const remaining = deadline - Date.now();
+    if (remaining < 30_000) return Promise.resolve({ ok: false, status: 504, error: "Revision took too long. Try a shorter length or a faster model." });
+    return callLLM(
+      modelInput,
+      buildRevisePrompt(dom, len, includeCertifications),
+      buildReviseUserMessage(jd, resumeData, findings),
+      maxTokens,
+      Math.min(840_000, remaining)
+    );
+  };
+
+  let r = await attempt(reviseBudget);
+  let revised = r.ok ? expandKeys(extractJSON(r.text)) : null;
+  const badOutput = !revised || !Array.isArray(revised.experience) || revised.experience.length === 0;
+  if (r.ok && badOutput) {
+    r = await attempt(reviseBudget);
+    revised = r.ok ? expandKeys(extractJSON(r.text)) : null;
+  }
   if (!r.ok) {
     return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
 
-  const revised = expandKeys(extractJSON(r.text));
-  if (!revised || !revised.experience) {
+  if (!revised || !Array.isArray(revised.experience) || revised.experience.length === 0) {
     return response(422, {
       error: r.truncated
-        ? "Model response was cut off (too long)."
-        : "Model returned invalid revised JSON. Try again.",
+        ? "Model response was cut off (too long). Try a shorter length or a different model."
+        : "Model returned invalid or incomplete revised JSON. Try again.",
       raw_preview: r.text.substring(0, 500),
     });
   }
@@ -659,14 +685,14 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call the selected provider with streaming (4 min timeout)
+    // Call the selected provider with streaming (14 min timeout)
     const m = modelInfo(modelAlias);
     let apiResponse;
     try {
       if (m.provider === "openai") {
         apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          signal: AbortSignal.timeout(240_000),
+          signal: AbortSignal.timeout(840_000),
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -685,7 +711,7 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
       } else {
         apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          signal: AbortSignal.timeout(240_000),
+          signal: AbortSignal.timeout(840_000),
           headers: {
             "Content-Type": "application/json",
             "x-api-key": process.env.ANTHROPIC_API_KEY,
@@ -694,7 +720,7 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
           body: JSON.stringify({
             model: m.id,
             // alwaysThinks models spend part of max_tokens on thinking
-            max_tokens: m.alwaysThinks ? streamMaxTokens + 8192 : streamMaxTokens,
+            max_tokens: m.alwaysThinks ? streamMaxTokens + 16384 : streamMaxTokens,
             stream: true,
             system: systemPrompt,
             messages: [

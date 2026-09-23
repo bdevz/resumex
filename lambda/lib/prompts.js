@@ -1066,7 +1066,7 @@ REVISION MODE — SURGICAL FIXES ONLY:
 You are revising a resume you already wrote, to resolve a specific list of recruiter findings. Rules:
 - Fix EXACTLY the findings listed in the user message. Change nothing else.
 - Keep every company, title, date, and the overall voice identical.
-- A rewritten bullet must keep its factual claim unless the finding says the claim itself is implausible — then ground it (real baseline, believable figure, or remove the number).
+- A rewritten bullet must keep its factual claim unless the finding says the claim itself is implausible — then remove or qualify the unsupported claim. Never replace it with an invented 'believable' number.
 - Do not introduce new AI-tell vocabulary, em-dashes, or uniform bullet shapes while fixing.
 - Return the COMPLETE revised resume JSON in the same schema — not a diff, not only the changed parts.`;
 }
