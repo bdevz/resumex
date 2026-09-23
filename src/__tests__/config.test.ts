@@ -1,24 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { ConfigValidator } from '../config/validator';
+import { validateConfig } from '../config/validator';
 
-describe('ConfigValidator', () => {
-  const validator = new ConfigValidator();
+describe('validateConfig legacy smoke checks', () => {
 
   it('should validate a valid configuration', () => {
     const config = {
       application: {
         name: 'test-app',
-        type: 'fullstack'
+        type: 'frontend'
       },
       aws: {
         region: 'us-east-1'
+      },
+      frontend: {
+        source_dir: './frontend'
       },
       deployment: {
         enable_monitoring: true
       }
     };
 
-    const result = validator.validate(config);
+    const result = validateConfig(config);
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
@@ -31,7 +33,7 @@ describe('ConfigValidator', () => {
       }
     };
 
-    const result = validator.validate(config);
+    const result = validateConfig(config);
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
   });

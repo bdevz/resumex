@@ -149,12 +149,14 @@ function checkAdmin(headers) {
 }
 
 // Model registry: dropdown alias → { id, provider, label }
-const DEFAULT_MODEL_ALIAS = "gpt-5.6-sol";
+const DEFAULT_MODEL_ALIAS = "gpt-6-sol";
 const MODELS = {
   // ── Anthropic ──
   // alwaysThinks: thinking is on by default and shares the max_tokens budget,
   // so those models get extra output headroom in callLLM/stream.
+  "claude-fable-5.1":  { id: "claude-fable-5-1", provider: "anthropic", label: "Claude Fable 5.1", alwaysThinks: true },
   "claude-fable-5":    { id: "claude-fable-5",              provider: "anthropic", label: "Claude Fable 5",   alwaysThinks: true },
+  "claude-opus-5.5":   { id: "claude-opus-5-5",             provider: "anthropic", label: "Claude Opus 5.5",  alwaysThinks: true },
   "claude-opus-5":     { id: "claude-opus-5",               provider: "anthropic", label: "Claude Opus 5",    alwaysThinks: true },
   "claude-opus-4.8":   { id: "claude-opus-4-8",            provider: "anthropic", label: "Claude Opus 4.8" },
   "claude-opus-4.7":   { id: "claude-opus-4-7",            provider: "anthropic", label: "Claude Opus 4.7" },
@@ -165,6 +167,9 @@ const MODELS = {
   "claude-sonnet-4.5": { id: "claude-sonnet-4-5-20250929", provider: "anthropic", label: "Claude Sonnet 4.5" },
   "claude-haiku-4.5":  { id: "claude-haiku-4-5-20251001",  provider: "anthropic", label: "Claude Haiku 4.5" },
   // ── OpenAI ──
+  "gpt-6-astra":   { id: "gpt-6-astra", provider: "openai", label: "GPT-6 Astra" },
+  "gpt-6-sol":     { id: "gpt-6-sol",     provider: "openai", label: "GPT-6 Sol" },
+  "gpt-6-luna":    { id: "gpt-6-luna",    provider: "openai", label: "GPT-6 Luna" },
   "gpt-5.6-sol":   { id: "gpt-5.6-sol",   provider: "openai", label: "GPT-5.6 Sol" },
   "gpt-5.6-terra": { id: "gpt-5.6-terra", provider: "openai", label: "GPT-5.6 Terra" },
   "gpt-5.6-luna":  { id: "gpt-5.6-luna",  provider: "openai", label: "GPT-5.6 Luna" },
@@ -184,16 +189,60 @@ function modelInfo(modelInput) {
   return { alias: DEFAULT_MODEL_ALIAS, ...MODELS[DEFAULT_MODEL_ALIAS] };
 }
 
+// Collect the text blocks of Anthropic's SSE response. Long thinking-model
+// requests must stream: a non-streaming HTTP response can hit provider timeouts
+// before a large complete resume is returned.
+async function readAnthropicStream(apiResponse) {
+  const reader = apiResponse.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", text = "", model = null, usage = {}, stopReason = null;
+  const accept = (line) => {
+    if (!line.startsWith("data: ")) return;
+    const raw = line.slice(6).trim();
+    if (!raw || raw === "[DONE]") return;
+    const event = JSON.parse(raw);
+    if (event.type === "error") throw new Error(event.error?.message || "Anthropic stream error");
+    if (event.type === "message_start") {
+      model = event.message?.model || model;
+      usage = { ...usage, ...(event.message?.usage || {}) };
+    }
+    if (event.type === "content_block_start" && event.content_block?.type === "text") text += event.content_block.text || "";
+    if (event.type === "content_block_delta" && event.delta?.type === "text_delta") text += event.delta.text || "";
+    if (event.type === "message_delta") {
+      stopReason = event.delta?.stop_reason || stopReason;
+      usage = { ...usage, ...(event.usage || {}) };
+    }
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop();
+    for (const line of lines) accept(line);
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) accept(buffer.trim());
+  return { content: [{ type: "text", text }], model, usage, stop_reason: stopReason };
+}
+
+// Internal pure stream parser is exported for a deterministic protocol test.
+exports._readAnthropicStream = readAnthropicStream;
+
 // Unified LLM call. Returns { ok:true, text, modelUsed, usage }
 // or { ok:false, status, error, details, isTimeout }.
-async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
+async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeoutMs = 840_000) {
   const m = modelInfo(modelInput);
   let apiResponse;
   try {
     if (m.provider === "openai") {
       apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        signal: AbortSignal.timeout(240_000),
+        // Slow thinking models (Fable 5/5.1 at high effort) can run for many
+        // minutes; the async-job pattern keeps the client off this call, so
+        // the only ceiling is the Lambda timeout (900s) minus result-write
+        // time. 840s leaves a minute of margin.
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -211,7 +260,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
     } else {
       apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        signal: AbortSignal.timeout(240_000),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           "Content-Type": "application/json",
           "x-api-key": process.env.ANTHROPIC_API_KEY,
@@ -220,7 +269,8 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
         body: JSON.stringify({
           model: m.id,
           // alwaysThinks models spend part of max_tokens on thinking
-          max_tokens: m.alwaysThinks ? maxTokens + 8192 : maxTokens,
+          max_tokens: m.alwaysThinks ? maxTokens + 16384 : maxTokens,
+          stream: !!m.alwaysThinks,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -234,7 +284,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
       status: 504,
       isTimeout,
       error: isTimeout
-        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-5.6 Luna) or disable XL mode."
+        ? "The model took too long to respond. Try a faster model (e.g. Claude Haiku or GPT-6 Luna) or choose Standard length."
         : `Network error calling LLM API: ${fetchErr.message}`,
     };
   }
@@ -250,7 +300,15 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens) {
     return { ok: false, status: apiResponse.status, error: friendly, details: errText };
   }
 
-  const data = await apiResponse.json();
+  let data;
+  try {
+    data = m.provider === "anthropic" && m.alwaysThinks
+      ? await readAnthropicStream(apiResponse)
+      : await apiResponse.json();
+  } catch (err) {
+    console.error(`${m.provider} response failed:`, err.message);
+    return { ok: false, status: 502, error: "The model response was interrupted. Try again." };
+  }
 
   if (m.provider === "openai") {
     if (data.error) {
@@ -500,22 +558,42 @@ async function handleRevise(body) {
   const dom = domain || "software";
   const len = resolveLength(body);
 
-  const r = await callLLM(
-    modelInput,
-    buildRevisePrompt(dom, len, includeCertifications),
-    buildReviseUserMessage(jd, resumeData, findings),
-    maxTokensFor(len)
-  );
+  // The revise pass must return the COMPLETE resume JSON, and reasoning models
+  // spend part of the completion budget on hidden reasoning tokens — at the
+  // plain generation budget this truncated in practice. Add headroom and
+  // retry once on truncation/invalid JSON (often stochastic).
+  const reviseBudget = maxTokensFor(len) + 8192;
+  // A second call must never get another full 840 seconds inside a 900-second
+  // Lambda. Leave time for S3 result/history writes even after a slow first call.
+  const deadline = Date.now() + 820_000;
+  const attempt = (maxTokens) => {
+    const remaining = deadline - Date.now();
+    if (remaining < 30_000) return Promise.resolve({ ok: false, status: 504, error: "Revision took too long. Try a shorter length or a faster model." });
+    return callLLM(
+      modelInput,
+      buildRevisePrompt(dom, len, includeCertifications),
+      buildReviseUserMessage(jd, resumeData, findings),
+      maxTokens,
+      Math.min(840_000, remaining)
+    );
+  };
+
+  let r = await attempt(reviseBudget);
+  let revised = r.ok ? expandKeys(extractJSON(r.text)) : null;
+  const badOutput = !revised || !Array.isArray(revised.experience) || revised.experience.length === 0;
+  if (r.ok && badOutput) {
+    r = await attempt(reviseBudget);
+    revised = r.ok ? expandKeys(extractJSON(r.text)) : null;
+  }
   if (!r.ok) {
     return response(r.status || 502, { error: r.error, status: r.status, details: r.details });
   }
 
-  const revised = expandKeys(extractJSON(r.text));
-  if (!revised || !revised.experience) {
+  if (!revised || !Array.isArray(revised.experience) || revised.experience.length === 0) {
     return response(422, {
       error: r.truncated
-        ? "Model response was cut off (too long)."
-        : "Model returned invalid revised JSON. Try again.",
+        ? "Model response was cut off (too long). Try a shorter length or a different model."
+        : "Model returned invalid or incomplete revised JSON. Try again.",
       raw_preview: r.text.substring(0, 500),
     });
   }
@@ -566,7 +644,7 @@ function handleModels() {
 
 // ── Streaming handler (for Lambda Function URL with RESPONSE_STREAM) ──
 
-if (typeof awslambda !== "undefined") {
+if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "function") {
   exports.streamHandler = awslambda.streamifyResponse(async (event, responseStream, _context) => {
     const method = getMethod(event);
     const path = getPath(event);
@@ -656,14 +734,14 @@ if (typeof awslambda !== "undefined") {
     // Send initial status
     responseStream.write(`data: ${JSON.stringify({ type: "status", message: "Connecting to AI..." })}\n\n`);
 
-    // Call the selected provider with streaming (4 min timeout)
+    // Call the selected provider with streaming (14 min timeout)
     const m = modelInfo(modelAlias);
     let apiResponse;
     try {
       if (m.provider === "openai") {
         apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          signal: AbortSignal.timeout(240_000),
+          signal: AbortSignal.timeout(840_000),
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -682,7 +760,7 @@ if (typeof awslambda !== "undefined") {
       } else {
         apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          signal: AbortSignal.timeout(240_000),
+          signal: AbortSignal.timeout(840_000),
           headers: {
             "Content-Type": "application/json",
             "x-api-key": process.env.ANTHROPIC_API_KEY,
@@ -691,7 +769,7 @@ if (typeof awslambda !== "undefined") {
           body: JSON.stringify({
             model: m.id,
             // alwaysThinks models spend part of max_tokens on thinking
-            max_tokens: m.alwaysThinks ? streamMaxTokens + 8192 : streamMaxTokens,
+            max_tokens: m.alwaysThinks ? streamMaxTokens + 16384 : streamMaxTokens,
             stream: true,
             system: systemPrompt,
             messages: [
@@ -895,38 +973,46 @@ exports.handler = async (event) => {
           details: resultBody.details || resultBody.raw_preview || undefined,
         });
       } else {
-        // Success — write result without spreading (avoids status field collision)
-        await writeJobResult(jobId, {
+        // Publish the generated result *before* the best-effort history write.
+        // If history stalls or the Lambda times out, the resume remains
+        // retrievable. The client gives persistence a short grace period.
+        const completed = {
           status: "complete",
           resumeData: resultBody.resumeData,
           scoring: resultBody.scoring,
           timeline_warnings: resultBody.timeline_warnings,
           lint: resultBody.lint,
-          // review-route fields (undefined on other routes, dropped by JSON)
           reviewer_model: resultBody.reviewer_model,
           verdict: resultBody.verdict,
           findings: resultBody.findings,
           model_used: resultBody.model_used,
           usage: resultBody.usage,
           mode: resultBody.mode,
-        });
-
-        // Save to per-user history. Best-effort: a failure here must never
-        // affect the generated resume the user is waiting on.
-        // Reviews produce no resume — nothing to save; revised resumes save
-        // as new entries through this same path.
-        if (route === "review") return response(200, { ok: true });
-        try {
-          await writeHistory(buildHistoryRecord({
-            id: jobId,
-            userName: body.__userName,
-            createdAt: new Date().toISOString(),
-            body,
-            resultBody: { ...resultBody, mode: resultBody.mode || (route === "optimize" ? "optimize" : "generate") },
-          }));
-        } catch (histErr) {
-          console.error("History write failed (non-fatal):", histErr);
+        };
+        await writeJobResult(jobId, { ...completed, historySaved: false, historyStatus: route === "review" ? "not_applicable" : "pending" });
+        if (route !== "review") {
+          let historySaved = false;
+          try {
+            await writeHistory(buildHistoryRecord({
+              id: jobId,
+              userName: body.__userName,
+              createdAt: new Date().toISOString(),
+              body,
+              resultBody: { ...resultBody, mode: resultBody.mode || (route === "optimize" ? "optimize" : "generate") },
+            }));
+            historySaved = true;
+          } catch (histErr) {
+            console.error("History write failed (non-fatal):", histErr);
+          }
+          try {
+            await writeJobResult(jobId, { ...completed, historySaved, historyStatus: historySaved ? "saved" : "failed" });
+          } catch (statusErr) {
+            // The first completed result is still durable; do not replace it
+            // with an error if the optional status update fails.
+            console.error("History status update failed:", statusErr);
+          }
         }
+
       }
     } catch (err) {
       console.error("Async job error:", err);

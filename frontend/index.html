@@ -361,17 +361,20 @@
 
     .bullet-score {
       flex-shrink: 0;
-      width: 28px;
-      height: 28px;
+      min-width: 64px;
+      height: 25px;
+      padding: 3px 8px;
       border-radius: 6px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       margin-top: 2px;
     }
+    .bullet-item.changed, #summary-text.changed-summary { border-left: 3px solid var(--green); padding-left: 10px; background: rgba(52,211,153,.06); }
+    .bullet-reason { color: var(--text-dim); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+    .change-tag { display: inline-block; color: var(--green); font-size: 11px; font-weight: 700; margin-left: 8px; }
 
     .score-excellent { background: var(--green-dim); color: var(--green); }
     .score-good { background: rgba(74, 124, 255, 0.15); color: var(--accent); }
@@ -395,11 +398,19 @@
       margin-bottom: 16px;
     }
 
-    .score-number {
-      font-size: 32px;
-      font-weight: 700;
-      font-family: var(--mono);
-    }
+    .review-headline { font-size: 17px; font-weight: 700; line-height: 1.35; }
+    .review-list { margin: 10px 0 0 20px; color: var(--text-dim); font-size: 13px; }
+    .review-list li { margin: 5px 0; }
+    .review-caveat { color: var(--text-muted); font-size: 12px; margin-top: 10px; }
+    .result-notice { border: 1px solid var(--green); background: var(--green-dim); color: #e8fff5; border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; font-size: 14px; }
+    .result-notice.warn { border-color: var(--amber); background: var(--amber-dim); color: #fff2cb; }
+    .design-presets { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin: 8px 0 16px; }
+    .design-preset { text-align: left; padding: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 9px; cursor: pointer; font: inherit; }
+    .design-preset:hover, .design-preset.on { border-color: var(--accent); background: rgba(74,124,255,.12); }
+    .design-preset strong, .design-preset small { display:block; }
+    .design-preset small { color: var(--text-dim); font-size: 11px; margin-top: 3px; }
+    .preset-lines { display:block; height: 45px; margin-bottom: 8px; background: linear-gradient(to bottom, currentColor 0 2px, transparent 2px 9px, currentColor 9px 10px, transparent 10px 18px, currentColor 18px 19px, transparent 19px 27px, currentColor 27px 28px, transparent 28px); opacity: .27; width: 60%; }
+    @media (max-width: 600px) { .design-presets { grid-template-columns: 1fr; } }
 
     .score-label {
       font-size: 13px;
@@ -864,7 +875,7 @@
     <!-- Header -->
     <header>
       <h1>ResumeX</h1>
-      <p>ATS-optimized resumes with Google XYZ formula bullets</p>
+      <p>Clear, tailored resumes built for human readers</p>
     </header>
 
     <!-- Auth -->
@@ -924,6 +935,7 @@
         <button class="mode-tab active" id="tab-optimize" onclick="setMode('optimize')">Optimize Mine</button>
         <button class="mode-tab" id="tab-generate" onclick="setMode('generate')">Generate New</button>
       </div>
+      <p class="field-hint" id="mode-hint" style="margin:-16px 0 22px;">Optimize uses your existing experience. Check every fact before applying.</p>
 
       <!-- Resume input (optimize mode only) -->
       <div class="field-group" id="resume-field">
@@ -954,7 +966,9 @@
           <label>Model</label>
           <select id="model-select">
             <optgroup label="Anthropic (Claude)">
+              <option value="claude-fable-5.1">Claude Fable 5.1</option>
               <option value="claude-fable-5">Claude Fable 5</option>
+              <option value="claude-opus-5.5">Claude Opus 5.5 (new)</option>
               <option value="claude-opus-5">Claude Opus 5</option>
               <option value="claude-opus-4.8">Claude Opus 4.8</option>
               <option value="claude-opus-4.7">Claude Opus 4.7</option>
@@ -966,7 +980,10 @@
               <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
             </optgroup>
             <optgroup label="OpenAI (ChatGPT)">
-              <option value="gpt-5.6-sol" selected>GPT-5.6 Sol</option>
+              <option value="gpt-6-sol" selected>GPT-6 Sol · recommended</option>
+              <option value="gpt-6-astra">GPT-6 Astra (advanced)</option>
+              <option value="gpt-6-luna">GPT-6 Luna (fast)</option>
+              <option value="gpt-5.6-sol">GPT-5.6 Sol</option>
               <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
               <option value="gpt-5.6-luna">GPT-5.6 Luna</option>
               <option value="gpt-5.5">GPT-5.5</option>
@@ -1002,6 +1019,11 @@
 
       <div class="field-group">
         <label>Resume Design</label>
+        <div class="design-presets" role="group" aria-label="Resume layouts">
+          <button type="button" class="design-preset on" data-preset="classic" aria-pressed="true" onclick="selectDesignPreset('classic')"><span class="preset-lines"></span><strong>Clean classic</strong><small>Black, single column · safest starting point</small></button>
+          <button type="button" class="design-preset" data-preset="modern" aria-pressed="false" onclick="selectDesignPreset('modern')"><span class="preset-lines"></span><strong>Modern</strong><small>Restrained blue headers · single column</small></button>
+          <button type="button" class="design-preset" data-preset="executive" aria-pressed="false" onclick="selectDesignPreset('executive')"><span class="preset-lines"></span><strong>Executive</strong><small>Serif hierarchy · single column</small></button>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
           <button type="button" class="btn-secondary" id="compose-btn" onclick="composeUnique()"
             style="padding:8px 14px;font-size:13px;">⚡ Compose a unique design</button>
@@ -1014,7 +1036,7 @@
             <div class="seg" id="seg-length">
               <button type="button" data-v="standard">Standard · 2 pg</button>
               <button type="button" data-v="xl">Long · 3 pg</button>
-              <button type="button" data-v="extended" class="on">Extended · 4–5 pg</button>
+              <button type="button" data-v="extended">Extended · 4–5 pg</button>
             </div>
 
             <button type="button" class="btn-secondary" id="customize-toggle"
@@ -1120,7 +1142,7 @@
         </div>
         <div class="progress-phase" data-phase="4">
           <div class="phase-icon"></div>
-          <span>Scoring bullet quality</span>
+          <span>Checking readability</span>
         </div>
       </div>
       <div class="progress-bar-outer">
@@ -1131,6 +1153,7 @@
 
     <!-- Results -->
     <div id="results">
+      <div id="result-notice" class="result-notice" role="status" aria-live="polite" style="display:none;"></div>
       <div class="results-header">
         <h2 id="results-title">Optimized Resume</h2>
         <div style="display:flex;gap:10px;">
@@ -1138,6 +1161,9 @@
           <button class="btn-secondary" onclick="startOver()">Start Over</button>
         </div>
       </div>
+      <!-- Errors from the results view (review/revise) must be visible here:
+           #error-box lives inside the hidden #main-form after generation. -->
+      <div class="error-box" id="results-error-box"></div>
 
       <!-- Meta -->
       <div class="section">
@@ -1145,15 +1171,13 @@
         <div class="meta-grid" id="meta-grid"></div>
       </div>
 
-      <!-- Score -->
+      <!-- Writing feedback: concrete signals, not a pseudo-precise rating -->
       <div class="section">
-        <div class="section-title">Bullet Quality</div>
-        <div class="score-bar">
-          <div class="score-number" id="avg-score">—</div>
-          <div>
-            <div style="font-weight:600;">Average Score</div>
-            <div class="score-label" id="score-count">across 0 bullets (out of 7)</div>
-          </div>
+        <div class="section-title">5-second resume review</div>
+        <div class="score-bar" style="display:block;">
+          <div class="review-headline" id="review-headline">Checking your resume…</div>
+          <ul class="review-list" id="review-list"></ul>
+          <p class="review-caveat">These are writing checks, not an ATS score or a prediction of hiring outcomes. Verify every fact and metric before sending.</p>
         </div>
         <div id="timeline-warnings"></div>
         <div id="lint-strip"></div>
@@ -1202,11 +1226,11 @@
     let currentMode = "optimize"; // "optimize" or "generate"
     // Composable design state (mirrors lambda/lib/design.js spec).
     const designState = {
-      length: "extended",
+      length: "standard",
       layout: "single-centered",
-      palette: "royal",
+      palette: "ink",
       typography: "calibri-clean",
-      headerStyle: "bottom-border",
+      headerStyle: "plain",
       sectionOrder: ["contact","summary","skills","experience","projects","education","certifications"],
       sectionVisibility: { contact:true, summary:true, skills:true, experience:true, projects:false, education:true, certifications:true },
       elements: { skillBars:false, dividers:false, callout:false, icons:false, headshot:false },
@@ -1552,6 +1576,9 @@
     // Compose a clean, ATS-safe, unique SINGLE-COLUMN design (mirrors the
     // backend composeDesign: single variants only, no tables/photo/icons).
     function composeUnique() {
+      document.querySelectorAll(".design-preset").forEach(function(btn) {
+        btn.classList.remove("on"); btn.setAttribute("aria-pressed", "false");
+      });
       const seed = Date.now() ^ Math.floor(Math.random() * 1e9);
       function r(n){ return Math.floor((Math.sin(seed * (n + 1)) * 10000 % 1 + 1) % 1 * 1000); }
       const variants = Object.keys(SINGLE_VARIANT_HEADER);
@@ -1572,12 +1599,34 @@
     document.getElementById("sel-layout").onchange = function(){ designState.layout = this.value; afterChange(); };
     document.getElementById("sel-typography").onchange = function(){ designState.typography = this.value; afterChange(); };
     document.getElementById("sel-header").onchange = function(){ designState.headerStyle = this.value; afterChange(); };
-    // Best unique ATS-safe design by default on load.
-    composeUnique();
+    // Deterministic, restrained single-column default. Random designs remain opt-in.
+    syncControls();
+    afterChange();
+
+    function selectDesignPreset(preset) {
+      const choices = {
+        classic: { layout:"single-centered", palette:"ink", typography:"calibri-clean", headerStyle:"plain" },
+        modern: { layout:"single-left", palette:"royal", typography:"calibri-clean", headerStyle:"bottom-border" },
+        executive: { layout:"single-centered", palette:"navy", typography:"georgia-exec", headerStyle:"bottom-border" },
+      };
+      Object.assign(designState, choices[preset] || choices.classic);
+      designState.elements = { skillBars:false, dividers:false, callout:false, icons:false, headshot:false };
+      designState.photo = null;
+      document.querySelectorAll(".design-preset").forEach(function(btn) {
+        const active = btn.dataset.preset === preset;
+        btn.classList.toggle("on", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      syncControls();
+      afterChange();
+    }
 
     // ── Mode switching ──
     function setMode(mode) {
       currentMode = mode;
+      document.getElementById("mode-hint").textContent = mode === "generate"
+        ? "Illustrative draft only: generated employers, accomplishments, and metrics are not verified. Replace them with your real history before use."
+        : "Optimize uses your existing experience. Check every fact before applying.";
       document.getElementById("tab-optimize").classList.toggle("active", mode === "optimize");
       document.getElementById("tab-generate").classList.toggle("active", mode === "generate");
       document.getElementById("resume-field").style.display = mode === "optimize" ? "block" : "none";
@@ -1878,8 +1927,9 @@
     }
 
     async function pollForResult(jobId) {
-      var maxAttempts = 90; // 90 * 3s = 4.5 minutes max (Lambda timeout is 5 min)
+      var maxAttempts = 305; // >15 min, so near-ceiling jobs can publish their final status
       var networkErrors = 0;
+      var historyPendingChecks = 0;
       for (var i = 0; i < maxAttempts; i++) {
         await new Promise(function(r) { setTimeout(r, 3000); });
         try {
@@ -1890,7 +1940,10 @@
           });
           if (!resp.ok) continue;
           var data = await resp.json();
-          if (data.status === "complete") return data;
+          if (data.status === "complete") {
+            if (data.historyStatus === "pending" && ++historyPendingChecks < 4) continue;
+            return data;
+          }
           if (data.status === "error") {
             var msg = data.error || "Job failed.";
             if (data.details) msg += " Details: " + (typeof data.details === "string" ? data.details.substring(0, 200) : JSON.stringify(data.details).substring(0, 200));
@@ -1908,18 +1961,21 @@
     }
 
     // ── Render results ──
-    function renderResults(data) {
+    function renderResults(data, previousResumeData = null) {
       const { resumeData, scoring, timeline_warnings, model_used, usage } = data;
+      const notice = document.getElementById("result-notice");
+      notice.style.display = "none";
+      notice.classList.remove("warn");
 
       // Update title based on mode
-      document.getElementById("results-title").textContent = data.mode === "optimize" ? "Optimized Resume" : "Generated Resume";
+      document.getElementById("results-title").textContent = data.mode === "revise" ? "Revised Resume" : data.mode === "optimize" ? "Optimized Resume" : "Generated Resume";
 
       // Meta
       const pjd = resumeData.parsed_jd || {};
       const metaGrid = document.getElementById("meta-grid");
       metaGrid.innerHTML = "";
       const metaItems = [
-        ["Mode", data.mode === "optimize" ? "Optimized" : "Generated"],
+        ["Mode", data.mode === "revise" ? "Revised" : data.mode === "optimize" ? "Optimized" : "Generated"],
         ["Role", pjd.role_title || "—"],
         ["Industry", pjd.industry || "—"],
         ["Cloud", (pjd.cloud_platform || "—").toUpperCase()],
@@ -1934,9 +1990,10 @@
         metaGrid.innerHTML += `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
       }
 
-      // Score
-      document.getElementById("avg-score").textContent = scoring ? scoring.average : "—";
-      document.getElementById("score-count").textContent = scoring ? `across ${scoring.bulletCount} bullets (out of 7)` : "";
+      // Writing signals describe *why* a bullet may need work. The legacy
+      // numeric heuristic is retained for old history records, not shown as a
+      // calibrated rating or an invented "out of 7" scale.
+      renderWritingFeedback(resumeData, data.lint || []);
 
       // Timeline warnings
       const warningsEl = document.getElementById("timeline-warnings");
@@ -1954,13 +2011,18 @@
       document.getElementById("review-status").textContent = "";
 
       // Summary
-      document.getElementById("summary-text").textContent = resumeData.professional_summary || "";
+      const summaryEl = document.getElementById("summary-text");
+      summaryEl.textContent = resumeData.professional_summary || "";
+      const summaryChanged = !!previousResumeData && previousResumeData.professional_summary !== resumeData.professional_summary;
+      summaryEl.classList.toggle("changed-summary", summaryChanged);
+      if (summaryChanged) summaryEl.insertAdjacentHTML("beforeend", '<span class="change-tag">Updated</span>');
 
       // Skills
       const skillsEl = document.getElementById("skills-container");
       skillsEl.innerHTML = "";
       if (resumeData.technical_skills) {
         for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
+          if (!String(skills || "").trim()) continue;
           skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${escapeHtml(cat)}:</span><span class="skills-list">${escapeHtml(skills)}</span></div>`;
         }
       }
@@ -1971,7 +2033,7 @@
 
       // Build scoring lookup
       const scoringMap = {};
-      if (scoring.results) {
+      if (scoring && scoring.results) {
         for (const company of scoring.results) {
           for (const b of company.bullets) {
             scoringMap[b.text] = b;
@@ -1979,25 +2041,26 @@
         }
       }
 
-      for (const exp of (resumeData.experience || [])) {
+      for (const [expIndex, exp] of (resumeData.experience || []).entries()) {
+        const oldExp = previousResumeData?.experience?.[expIndex];
         let html = `<div class="exp-entry">`;
         html += `<div class="exp-company">${escapeHtml(exp.company || "")} <span class="exp-dates">${escapeHtml(exp.start_date || "")} — ${escapeHtml(exp.end_date || "")}</span></div>`;
 
         if (exp.is_consulting && exp.clients) {
           html += `<div class="exp-title">${escapeHtml(exp.title || "Software Engineer")} &middot; ${escapeHtml(exp.location || "")}</div>`;
-          for (const client of exp.clients) {
+          for (const [clientIndex, client] of exp.clients.entries()) {
             html += `<div class="client-entry">`;
             html += `<div class="client-name">Client: ${escapeHtml(client.client_name || "")} <span class="exp-dates">${escapeHtml(client.start_date || "")} — ${escapeHtml(client.end_date || "")}</span></div>`;
             html += `<div class="exp-title">${escapeHtml(client.title || "")}</div>`;
-            for (const bullet of client.bullets || []) {
-              html += renderBullet(bullet, scoringMap);
+            for (const [bulletIndex, bullet] of (client.bullets || []).entries()) {
+              html += renderBullet(bullet, scoringMap, oldExp?.clients?.[clientIndex]?.bullets?.[bulletIndex]);
             }
             html += `</div>`;
           }
         } else {
           html += `<div class="exp-title">${escapeHtml(exp.title || "")} &middot; ${escapeHtml(exp.location || "")}</div>`;
-          for (const bullet of exp.bullets || []) {
-            html += renderBullet(bullet, scoringMap);
+          for (const [bulletIndex, bullet] of (exp.bullets || []).entries()) {
+            html += renderBullet(bullet, scoringMap, oldExp?.bullets?.[bulletIndex]);
           }
         }
 
@@ -2018,17 +2081,46 @@
       });
     }
 
-    function renderBullet(text, scoringMap) {
-      const scoreData = scoringMap[text];
-      let scoreClass = "score-needs";
-      let scoreVal = "?";
-      if (scoreData) {
-        scoreVal = scoreData.score;
-        if (scoreData.grade === "Excellent") scoreClass = "score-excellent";
-        else if (scoreData.grade === "Good") scoreClass = "score-good";
-        else if (scoreData.grade === "Rewrite required") scoreClass = "score-rewrite";
-      }
-      return `<div class="bullet-item"><div class="bullet-score ${scoreClass}">${scoreVal}</div><div class="bullet-text">${escapeHtml(text)}</div></div>`;
+    function bulletAdvice(text) {
+      const notes = [];
+      if (/^(?:was|were|is|are|responsible for|helped with|worked on|involved in|participated in)\b/i.test(text.trim()))
+        notes.push("Lead with your own action rather than passive or vague phrasing");
+      if (text.length > 220) notes.push("Trim this so the result is easier to scan");
+      if (/\b(?:leverage|utilize|synergy|robust|seamless|cutting-edge|proven track record)\b/i.test(text))
+        notes.push("Replace stock language with the specific work you did");
+      if (!/\b(?:reduced|cut|improved|increased|decreased|saved|resolved|prevented|raised|grew|shortened|accelerated|eliminated|unblocked|stabilized|from .+ to )\b/i.test(text))
+        notes.push("Add a concrete result or explain why this work mattered, if you can verify it");
+      return notes;
+    }
+
+    function renderWritingFeedback(resumeData, lint) {
+      const jobs = resumeData.experience || [];
+      const bullets = jobs.flatMap(job => (job.bullets || []).concat((job.clients || []).flatMap(c => c.bullets || [])));
+      const dense = jobs.filter(job => (job.bullets || []).length > 6);
+      const passive = bullets.filter(b => /^(?:was|were|is|are|responsible for|helped with|worked on|involved in|participated in)\b/i.test(String(b).trim())).length;
+      const long = bullets.filter(b => String(b).length > 220).length;
+      const vague = bullets.filter(b => bulletAdvice(String(b)).some(note => note.startsWith("Add a concrete result"))).length;
+      const issues = [];
+      if (dense.length) issues.push(`${dense.length} role${dense.length === 1 ? " has" : "s have"} more than 6 bullets. Put the most relevant achievements first and consider cutting repetition.`);
+      if (vague) issues.push(`${vague} of ${bullets.length} bullets do not state a clear outcome. Add a verifiable result or explain the value, without inventing numbers.`);
+      if (passive) issues.push(`${passive} bullet${passive === 1 ? " starts" : "s start"} with passive or vague phrasing. Name your action first.`);
+      if (long) issues.push(`${long} long bullet${long === 1 ? " may" : "s may"} slow a quick scan. Shorten only where meaning is preserved.`);
+      const majorLint = lint.filter(f => f.severity === "major").length;
+      if (majorLint) issues.push(`${majorLint} additional mechanical writing flag${majorLint === 1 ? "" : "s"} below; inspect the quoted text before changing it.`);
+      document.getElementById("review-headline").textContent = bullets.length
+        ? (issues.length ? `${issues.length} ${issues.length === 1 ? "thing" : "things"} to review before sending` : "No obvious writing flags in this quick check")
+        : "No experience bullets to review yet";
+      document.getElementById("review-list").innerHTML = (issues.length ? issues.slice(0, 4) : ["Read the first two bullets under each role aloud: do they show your action and a believable result?"])
+        .map(item => `<li>${escapeHtml(item)}</li>`).join("");
+    }
+
+    function renderBullet(text, scoringMap, previousText) {
+      const notes = bulletAdvice(String(text));
+      const changed = previousText != null && previousText !== text;
+      const label = notes.length ? "Review" : "No quick flag";
+      const cls = notes.length ? "score-needs" : "score-good";
+      const reason = notes.length ? notes.slice(0, 2).join("; ") : "No quick writing flag; still verify the claim and its relevance";
+      return `<div class="bullet-item${changed ? " changed" : ""}"><div class="bullet-score ${cls}">${label}</div><div><div class="bullet-text">${escapeHtml(text)}${changed ? '<span class="change-tag">Updated</span>' : ""}</div><div class="bullet-reason">${escapeHtml(reason)}</div></div></div>`;
     }
 
     function escapeHtml(str) {
@@ -2147,8 +2239,19 @@
         const submitData = await resp.json();
         const data = submitData.jobId ? await pollForResult(submitData.jobId) : submitData;
         if (!data || !data.resumeData) throw new Error(data?.error || "No revised resume received.");
+        const previous = currentResumeData;
         currentResumeData = data.resumeData;
-        renderResults(data); // re-renders scores + lint, resets the review panel
+        renderResults(data, previous); // updated bullets visibly marked
+        const notice = document.getElementById("result-notice");
+        const changedCount = (data.resumeData.experience || []).reduce((count, job, ji) =>
+          count + (job.bullets || []).filter((b, bi) => previous?.experience?.[ji]?.bullets?.[bi] !== b).length, 0);
+        if (data.historySaved === true) {
+          notice.textContent = `Changes applied${changedCount ? ` to ${changedCount} bullet${changedCount === 1 ? "" : "s"}` : ""} and saved to My History. Review the revised content and highlighted edits before downloading.`;
+        } else {
+          notice.textContent = "Changes applied to this view, but saving to My History was not confirmed. Download now or retry after checking History.";
+          notice.classList.add("warn");
+        }
+        notice.style.display = "block";
       } catch (err) {
         st.textContent = "";
         if (btn) btn.disabled = false;
@@ -2227,14 +2330,14 @@
 
     function historyRowHtml(item) {
       const company = item.targetCompany ? (" · " + escapeHtml(item.targetCompany)) : "";
-      const score = (item.score === null || item.score === undefined) ? "—" : item.score;
+      // The old numeric heuristic has no calibrated denominator or hiring meaning.
       const mode = item.mode === "optimize" ? "Optimized" : "Generated";
       return `<div class="hist-row" data-id="${escapeHtml(item.id)}" data-user="${escapeHtml(item.userName || "")}">
         <div class="hist-main">
           <div class="hist-title">${escapeHtml(item.jdTitle || "(untitled role)")}${company}</div>
           <div class="hist-sub">${mode} · ${escapeHtml(item.domain || "software")} · ${fmtDate(item.createdAt)} · ${escapeHtml(item.candidateName || "")}</div>
         </div>
-        <div class="hist-score">${score}</div>
+        <div class="hist-score">Open</div>
       </div>`;
     }
 
@@ -2340,13 +2443,19 @@
 
     // ── Errors ──
     function showError(msg) {
-      const el = document.getElementById("error-box");
-      el.textContent = msg;
-      el.style.display = "block";
+      // Write to both error boxes: the form one (visible pre-generation) and
+      // the results one (visible once #main-form is hidden after generation).
+      for (const id of ["error-box", "results-error-box"]) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.style.display = "block";
+      }
     }
 
     function hideError() {
-      document.getElementById("error-box").style.display = "none";
+      for (const id of ["error-box", "results-error-box"]) {
+        document.getElementById(id).style.display = "none";
+      }
     }
   </script>
 </body>

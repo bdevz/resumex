@@ -26,7 +26,8 @@ npm run build
 ### 2. Configure Environment Variables
 
 You'll need to set these during deployment:
-- `OPENROUTER_API_KEY`: Your OpenRouter API key (sk-or-...)
+- `ANTHROPIC_API_KEY`: Your Anthropic API key (sk-ant-...)
+- `OPENAI_API_KEY`: Your OpenAI API key (optional — enables the GPT models)
 - `SHARED_PASSPHRASE`: Team passphrase for accessing the app
 - `ADMIN_PASSPHRASE`: Separate passphrase that unlocks the Admin usage-review view
 
@@ -76,11 +77,11 @@ backend:
   source_dir: ./lambda
   handler: index.handler
   runtime: nodejs18.x
-  timeout: 60
+  timeout: 900
   memory: 512
   environment_variables:
     NODE_ENV: production
-    # Add OPENROUTER_API_KEY and SHARED_PASSPHRASE during deployment
+    # Add ANTHROPIC_API_KEY, OPENAI_API_KEY and SHARED_PASSPHRASE during deployment
 
 deployment:
   stack_name: resumex-stack
@@ -108,7 +109,8 @@ aws lambda update-function-configuration \
   --function-name resumex-function \
   --environment 'Variables={
     NODE_ENV=production,
-    OPENROUTER_API_KEY=sk-or-your-key-here,
+    ANTHROPIC_API_KEY=sk-ant-your-key-here,
+    OPENAI_API_KEY=sk-your-openai-key,
     SHARED_PASSPHRASE=your-team-passphrase
   }'
 ```
@@ -143,11 +145,12 @@ Or manually delete the CloudFormation stack from the AWS Console.
 ## Troubleshooting
 
 ### Lambda Timeout
-If resume generation takes too long, increase timeout:
+Slow thinking models (Claude Fable 5 / 5.1) can take several minutes. The function
+deploys with a 900s timeout (the Lambda maximum); the per-request LLM abort is 840s:
 ```bash
 aws lambda update-function-configuration \
-  --function-name resumex-function \
-  --timeout 90
+  --function-name resume-generator \
+  --timeout 900
 ```
 
 ### CORS Issues

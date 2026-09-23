@@ -139,7 +139,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --handler "index.handler" \
   --role "$ROLE_ARN" \
   --zip-file "fileb://lambda.zip" \
-  --timeout 300 \
+  --timeout 900 \
   --memory-size 512 \
   --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY,ADMIN_PASSPHRASE=$ADMIN_PASSPHRASE}" \
   --region "$REGION" \
@@ -155,7 +155,7 @@ LAMBDA_ARN=$(aws lambda create-function \
 
   aws lambda update-function-configuration \
     --function-name "$FUNCTION_NAME" \
-    --timeout 300 \
+    --timeout 900 \
     --memory-size 512 \
     --runtime "nodejs22.x" \
     --environment "Variables={ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,SHARED_PASSPHRASE=$SHARED_PASSPHRASE,OPENAI_API_KEY=$OPENAI_API_KEY,ADMIN_PASSPHRASE=$ADMIN_PASSPHRASE}" \
