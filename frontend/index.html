@@ -2018,6 +2018,7 @@
       skillsEl.innerHTML = "";
       if (resumeData.technical_skills) {
         for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
+          if (!String(skills || "").trim()) continue;
           skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${escapeHtml(cat)}:</span><span class="skills-list">${escapeHtml(skills)}</span></div>`;
         }
       }
@@ -2083,7 +2084,7 @@
       if (text.length > 220) notes.push("Trim this so the result is easier to scan");
       if (/\b(?:leverage|utilize|synergy|robust|seamless|cutting-edge|proven track record)\b/i.test(text))
         notes.push("Replace stock language with the specific work you did");
-      if (!/\b(?:reduced|cut|improved|increased|decreased|saved|launched|shipped|delivered|automated|prevented|raised|grew|shortened|accelerated|eliminated|unblocked|stabilized|from .+ to )\b/i.test(text))
+      if (!/\b(?:reduced|cut|improved|increased|decreased|saved|resolved|prevented|raised|grew|shortened|accelerated|eliminated|unblocked|stabilized|from .+ to )\b/i.test(text))
         notes.push("Add a concrete result or explain why this work mattered, if you can verify it");
       return notes;
     }
@@ -2103,7 +2104,7 @@
       const majorLint = lint.filter(f => f.severity === "major").length;
       if (majorLint) issues.push(`${majorLint} additional mechanical writing flag${majorLint === 1 ? "" : "s"} below; inspect the quoted text before changing it.`);
       document.getElementById("review-headline").textContent = bullets.length
-        ? (issues.length ? `${issues.length} things to review before sending` : "No obvious writing flags in this quick check")
+        ? (issues.length ? `${issues.length} ${issues.length === 1 ? "thing" : "things"} to review before sending` : "No obvious writing flags in this quick check")
         : "No experience bullets to review yet";
       document.getElementById("review-list").innerHTML = (issues.length ? issues.slice(0, 4) : ["Read the first two bullets under each role aloud: do they show your action and a believable result?"])
         .map(item => `<li>${escapeHtml(item)}</li>`).join("");
@@ -2112,9 +2113,9 @@
     function renderBullet(text, scoringMap, previousText) {
       const notes = bulletAdvice(String(text));
       const changed = previousText != null && previousText !== text;
-      const label = notes.length ? "Review" : "Clear";
+      const label = notes.length ? "Review" : "No quick flag";
       const cls = notes.length ? "score-needs" : "score-good";
-      const reason = notes.length ? notes.slice(0, 2).join("; ") : "Action and outcome appear clear; verify the claim";
+      const reason = notes.length ? notes.slice(0, 2).join("; ") : "No quick writing flag; still verify the claim and its relevance";
       return `<div class="bullet-item${changed ? " changed" : ""}"><div class="bullet-score ${cls}">${label}</div><div><div class="bullet-text">${escapeHtml(text)}${changed ? '<span class="change-tag">Updated</span>' : ""}</div><div class="bullet-reason">${escapeHtml(reason)}</div></div></div>`;
     }
 
