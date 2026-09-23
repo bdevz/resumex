@@ -4,5 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Lambda's CommonJS suites use node:test; run them separately with node --test.
+    include: ['src/**/*.test.ts'],
   },
 });

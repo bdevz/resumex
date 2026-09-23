@@ -372,7 +372,7 @@
       font-weight: 700;
       margin-top: 2px;
     }
-    .bullet-item.changed { border-left: 3px solid var(--green); padding-left: 10px; background: rgba(52,211,153,.06); }
+    .bullet-item.changed, #summary-text.changed-summary { border-left: 3px solid var(--green); padding-left: 10px; background: rgba(52,211,153,.06); }
     .bullet-reason { color: var(--text-dim); font-size: 12px; margin-top: 4px; line-height: 1.4; }
     .change-tag { display: inline-block; color: var(--green); font-size: 11px; font-weight: 700; margin-left: 8px; }
 
@@ -2011,7 +2011,11 @@
       document.getElementById("review-status").textContent = "";
 
       // Summary
-      document.getElementById("summary-text").textContent = resumeData.professional_summary || "";
+      const summaryEl = document.getElementById("summary-text");
+      summaryEl.textContent = resumeData.professional_summary || "";
+      const summaryChanged = !!previousResumeData && previousResumeData.professional_summary !== resumeData.professional_summary;
+      summaryEl.classList.toggle("changed-summary", summaryChanged);
+      if (summaryChanged) summaryEl.insertAdjacentHTML("beforeend", '<span class="change-tag">Updated</span>');
 
       // Skills
       const skillsEl = document.getElementById("skills-container");
@@ -2242,7 +2246,7 @@
         const changedCount = (data.resumeData.experience || []).reduce((count, job, ji) =>
           count + (job.bullets || []).filter((b, bi) => previous?.experience?.[ji]?.bullets?.[bi] !== b).length, 0);
         if (data.historySaved === true) {
-          notice.textContent = `Changes applied${changedCount ? ` to ${changedCount} bullet${changedCount === 1 ? "" : "s"}` : ""} and saved to My History. Review highlighted updates before downloading.`;
+          notice.textContent = `Changes applied${changedCount ? ` to ${changedCount} bullet${changedCount === 1 ? "" : "s"}` : ""} and saved to My History. Review the revised content and highlighted edits before downloading.`;
         } else {
           notice.textContent = "Changes applied to this view, but saving to My History was not confirmed. Download now or retry after checking History.";
           notice.classList.add("warn");

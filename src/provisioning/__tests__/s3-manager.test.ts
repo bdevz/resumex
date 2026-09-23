@@ -13,7 +13,7 @@ vi.mock('@aws-sdk/client-s3', () => ({
   PutObjectCommand: vi.fn(),
   HeadBucketCommand: vi.fn(),
   GetBucketLocationCommand: vi.fn(),
-  PutBucketPublicAccessBlockCommand: vi.fn()
+  PutPublicAccessBlockCommand: vi.fn()
 }));
 
 vi.mock('fs', () => ({
