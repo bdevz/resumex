@@ -4,7 +4,7 @@ Updated 2026-09-23. This is product guidance, not an ATS pass-rate claim or a va
 
 ## What the UI checks
 
-The 5-second review favors an immediately understandable action and result. It calls out dense roles (more than six bullets), passive or vague openings, long bullets, and bullets whose value is not apparent. Each bullet shows a short reason instead of an uncalibrated numeric rating. Recruiter lint remains separate for mechanical flags. A “Clear” badge only means no listed rule fired; it does not verify factual accuracy or predict interviews.
+The 5-second review calls out dense roles (more than six bullets), passive or vague openings, long bullets, stock phrasing and obvious filler. It does not mark every bullet “Review” merely because it lacks a narrow list of impact verbs; qualitative purpose, scope and adoption count too. A very short action-only line may get a specific suggestion. The “No quick flag” label means only that no listed rule fired, not that a claim is verified or predicts interviews. The separate Recruiter Review and lint checks still deserve human judgment. On the strongest bullets, add supported value when useful, but never invent a metric.
 
 Optimization must not invent metrics, tools, credentials, employers, or outcomes absent from the source resume. Generated-new resumes are illustrative drafts, not verified candidate histories. The user must verify every claim before sending.
 
@@ -29,3 +29,4 @@ These are anecdotal user comments, not verified recruiter credentials or scienti
 3. Generate or optimize a synthetic resume and confirm the numeric “out of 7” panel is gone, feedback gives reasons, and the DOCX downloads with hanging indents.
 4. Run recruiter review, apply selected fixes, inspect highlighted changes, and confirm the saved message appears only when history persistence succeeds. A failed save must show a warning, not success.
 5. Confirm My History reopens the revised result. Do not treat a successful `/status` response alone as proof of persistence.
+6. Enter an incorrect team passphrase: Unlock must keep the gate visible and must not save it. Reload with a stale saved passphrase: the gate must ask for fresh credentials, not display a false signed-in state. A History 401 must return to the gate with a clear recovery message. Verify a valid session still opens History.

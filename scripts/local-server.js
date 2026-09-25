@@ -83,6 +83,18 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { default: "gpt-6-sol", models: [{ alias: "gpt-6-sol", id: "gpt-6-sol", provider: "openai", label: "GPT-6 Sol (local)" }] });
   }
   if (req.method !== "POST") return send(res, 404, { error: "Not found" });
+  // Local preview normally accepts any passphrase; tests can opt into a
+  // synthetic expected value without using the production secret.
+  if (url === "/auth/verify") {
+    const expected = process.env.RESUMEX_LOCAL_TEST_PASSPHRASE;
+    if (expected && req.headers['x-passphrase'] !== expected) return send(res, 401, { error: "Invalid passphrase" });
+    return send(res, 200, { ok: true });
+  }
+
+  if (url === "/history/list") {
+    if (process.env.RESUMEX_LOCAL_TEST_HISTORY_401 === '1') return send(res, 401, { error: 'Invalid passphrase' });
+    return send(res, 200, { items: [] });
+  }
 
   const body = await readBody(req);
 

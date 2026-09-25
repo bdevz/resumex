@@ -139,8 +139,8 @@ function getHeader(headers, name) {
 }
 
 function checkAuth(headers) {
-  const passphrase = headers["x-passphrase"] || headers["X-Passphrase"];
-  return passphrase && passphrase === process.env.SHARED_PASSPHRASE;
+  const passphrase = getHeader(headers, "x-passphrase");
+  return !!passphrase && !!process.env.SHARED_PASSPHRASE && passphrase === process.env.SHARED_PASSPHRASE;
 }
 
 function checkAdmin(headers) {
@@ -1043,6 +1043,12 @@ exports.handler = async (event) => {
   // All other routes need auth
   if (!checkAuth(headers)) {
     return response(401, { error: "Invalid passphrase" });
+  }
+
+  // A cheap authenticated check for the browser gate. Do not treat a
+  // nonempty client-side passphrase as a signed-in session.
+  if (path === "/auth/verify" && method === "POST") {
+    return response(200, { ok: true });
   }
 
   const body = parseBody(event);
