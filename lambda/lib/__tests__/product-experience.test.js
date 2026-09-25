@@ -19,6 +19,22 @@ describe('human-readable ResumeX release', () => {
     assert.ok(byAlias['claude-fable-5.1'] && byAlias['gpt-6-astra'], 'preserve existing production options');
   });
 
+  it('verifies the team passphrase server-side and accepts header casing', async () => {
+    const original = process.env.SHARED_PASSPHRASE;
+    process.env.SHARED_PASSPHRASE = 'synthetic-test-secret';
+    const event = (header) => ({ rawPath: '/auth/verify', requestContext: { http: { method: 'POST' } }, headers: header });
+    try {
+      assert.equal((await handler(event({ 'X-Passphrase': 'wrong' }))).statusCode, 401);
+      assert.equal((await handler(event({}))).statusCode, 401);
+      const accepted = await handler(event({ 'X-PASSPHRASE': 'synthetic-test-secret' }));
+      assert.equal(accepted.statusCode, 200);
+      assert.deepEqual(JSON.parse(accepted.body), { ok: true });
+    } finally {
+      if (original === undefined) delete process.env.SHARED_PASSPHRASE;
+      else process.env.SHARED_PASSPHRASE = original;
+    }
+  });
+
   it('collects text from chunked Anthropic SSE without leaking hidden thinking', async () => {
     const events = [
       { type: 'message_start', message: { model: 'claude-opus-5-5', usage: { input_tokens: 25 } } },
