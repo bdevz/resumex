@@ -39,7 +39,10 @@ const flagged = [
 describe('human-readable frontend review', () => {
   it('does not penalize concrete work merely for lacking a magic outcome verb', () => {
     for (const bullet of clear) assert.deepEqual([...check(bullet).notes], [], bullet);
-    assert.match(html, /const label = notes\.length \? "Review" : "No quick flag"/);
+    // Clean bullets carry no per-line label; only real notes render a flag.
+    assert.doesNotMatch(html, /No quick flag/);
+    assert.doesNotMatch(html, /No quick writing flag/);
+    assert.match(html, /notes\.length \? "flagged" : ""/);
     assert.doesNotMatch(html, /bullets do not state a clear outcome/);
   });
 

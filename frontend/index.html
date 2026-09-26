@@ -303,27 +303,30 @@
 
     .meta-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px 24px;
     }
 
-    .meta-item {
-      padding: 12px;
-      background: var(--surface-2);
-      border-radius: 8px;
-    }
+    .meta-item { min-width: 0; }
 
     .meta-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 2px;
     }
 
     .meta-value {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 500;
+      overflow-wrap: anywhere;
+    }
+
+    .meta-usage {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
     }
 
     /* ── Experience preview ── */
@@ -334,58 +337,122 @@
 
     .exp-entry:last-child { border-bottom: none; }
 
+    .exp-entry:first-child { padding-top: 0; }
+
+    .exp-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 2px 16px;
+    }
+
     .exp-company {
-      font-weight: 600;
-      font-size: 15px;
+      font-weight: 700;
+      font-size: 16px;
     }
 
     .exp-title {
       color: var(--text-dim);
       font-size: 14px;
-      margin-bottom: 8px;
+      margin: 2px 0 10px;
     }
 
     .exp-dates {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text-muted);
+      font-size: 13px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
+
+    /* Resume bullets: clean by default; only edits and real flags are marked. */
+    .bullet-list { list-style: none; margin: 0; padding: 0; max-width: 78ch; }
 
     .bullet-item {
-      display: flex;
-      gap: 10px;
-      padding: 6px 0;
-      font-size: 14px;
-      line-height: 1.5;
+      position: relative;
+      padding: 5px 10px 5px 30px;
+      border-left: 3px solid transparent;
+      border-radius: 0 6px 6px 0;
+      font-size: 14.5px;
+      line-height: 1.6;
     }
+    .bullet-item::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 15px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .bullet-row { display: flex; align-items: flex-start; gap: 12px; }
+    .bullet-text { flex: 1 1 auto; min-width: 0; color: var(--text); }
+    .bullet-item + .bullet-item { margin-top: 2px; }
 
-    .bullet-score {
-      flex-shrink: 0;
-      min-width: 64px;
-      height: 25px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+    .bullet-item.changed, .summary-text.changed-summary {
+      border-left-color: var(--green);
+      background: rgba(52, 211, 153, .07);
+    }
+    .bullet-item.flagged::before { background: var(--amber); width: 7px; height: 7px; left: 13px; top: 14px; }
+    .bullet-note {
+      margin-top: 3px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #e9c46a;
+    }
+    .bullet-note strong { font-weight: 600; }
+
+    .change-chip {
+      flex: 0 0 auto;
+      display: inline-block;
+      margin-top: 3px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(52, 211, 153, .45);
+      color: var(--green);
       font-size: 11px;
-      font-weight: 700;
-      margin-top: 2px;
+      font-weight: 600;
+      line-height: 1.5;
+      letter-spacing: .02em;
     }
-    .bullet-item.changed, #summary-text.changed-summary { border-left: 3px solid var(--green); padding-left: 10px; background: rgba(52,211,153,.06); }
-    .bullet-reason { color: var(--text-dim); font-size: 12px; margin-top: 4px; line-height: 1.4; }
-    .change-tag { display: inline-block; color: var(--green); font-size: 11px; font-weight: 700; margin-left: 8px; }
+    .change-chip[hidden] { display: none; }
 
-    .score-excellent { background: var(--green-dim); color: var(--green); }
-    .score-good { background: rgba(74, 124, 255, 0.15); color: var(--accent); }
-    .score-needs { background: var(--amber-dim); color: var(--amber); }
-    .score-rewrite { background: var(--red-dim); color: var(--red); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .section-head .section-title { margin-bottom: 0; }
 
-    .bullet-text {
-      color: var(--text-dim);
-      font-family: var(--mono);
-      font-size: 13px;
+    .summary-text { font-size: 14.5px; line-height: 1.7; max-width: 78ch; }
+    .summary-text.changed-summary { border-left: 3px solid var(--green); padding: 8px 12px; border-radius: 0 6px 6px 0; }
+
+    /* Overview bar above the resume content */
+    .resume-overview {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+      padding: 12px 16px; margin-bottom: 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 14px; color: var(--text-dim);
     }
+    .resume-overview:empty { display: none; }
+    .overview-count {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: none; border: none; padding: 2px 0; font: inherit; color: var(--text); cursor: pointer;
+    }
+    .overview-count:hover, .overview-count:focus-visible { text-decoration: underline; }
+    .overview-count[disabled] { cursor: default; text-decoration: none; color: var(--text-dim); }
+    .overview-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .overview-swatch.sw-changed { background: var(--green); }
+    .overview-swatch.sw-flag { background: var(--amber); border-radius: 50%; }
+    .overview-count { font-size: 14px; font-weight: 500; border-radius: 4px; }
+    .overview-toggle {
+      margin: 0 0 0 auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      color: var(--text-dim); font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: normal;
+    }
+    .overview-toggle input { width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--accent); }
+    .jump-target { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    #results.only-marks .bullet-item:not(.changed):not(.flagged),
+    #results.only-marks .exp-entry.no-marks,
+    #results.only-marks .client-entry.no-marks,
+    #results.only-marks .section.skills-section { display: none; }
 
     /* ── Score summary ── */
     .score-bar {
@@ -398,10 +465,12 @@
       margin-bottom: 16px;
     }
 
+    .review-card { display: block; padding: 16px 18px; border-left: 3px solid var(--accent); }
+    .review-card.has-issues { border-left-color: var(--amber); }
     .review-headline { font-size: 17px; font-weight: 700; line-height: 1.35; }
-    .review-list { margin: 10px 0 0 20px; color: var(--text-dim); font-size: 13px; }
-    .review-list li { margin: 5px 0; }
-    .review-caveat { color: var(--text-muted); font-size: 12px; margin-top: 10px; }
+    .review-list { margin: 10px 0 0 18px; color: var(--text); font-size: 14px; line-height: 1.5; max-width: 78ch; }
+    .review-list li { margin: 4px 0; }
+    .review-caveat { color: var(--text-dim); font-size: 12.5px; margin-top: 12px; }
     .result-notice { border: 1px solid var(--green); background: var(--green-dim); color: #e8fff5; border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; font-size: 14px; }
     .result-notice.warn { border-color: var(--amber); background: var(--amber-dim); color: #fff2cb; }
     .design-presets { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin: 8px 0 16px; }
@@ -428,24 +497,27 @@
     }
 
     /* ── Recruiter lint + adversarial review ── */
-    .lint-details { margin-top: 10px; font-size: 13px; }
-    .lint-details summary { cursor: pointer; color: var(--text-muted); padding: 6px 0; }
+    .lint-details { margin-top: 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; }
+    .lint-details summary { cursor: pointer; color: var(--text); padding: 10px 0; font-size: 13.5px; }
+    .lint-details summary .lint-sub { color: var(--text-dim); }
+    .lint-details[open] { padding-bottom: 8px; }
+    .lint-details .lint-item { background: var(--surface-2); border-color: transparent; }
     .lint-item, .review-finding {
       display: flex; gap: 8px; align-items: flex-start;
       padding: 8px 10px; margin: 6px 0; border-radius: 8px;
       background: var(--surface); border: 1px solid var(--border);
       font-size: 13px; line-height: 1.5;
     }
-    .review-finding { cursor: pointer; }
-    .review-finding input { margin-top: 3px; }
+    .review-finding { cursor: pointer; color: var(--text); font-weight: 400; text-transform: none; letter-spacing: normal; }
+    .review-finding input { margin-top: 3px; width: 16px; height: 16px; padding: 0; flex: 0 0 auto; accent-color: var(--accent); }
     .sev {
       flex: 0 0 auto; padding: 1px 8px; border-radius: 10px;
       font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
     }
     .sev-reject_risk { background: #7f1d1d; color: #fecaca; }
     .sev-major { background: var(--amber-dim); color: var(--amber); }
-    .sev-minor { background: var(--surface-2); color: var(--text-muted); }
-    .finding-quote { color: var(--text-muted); font-style: italic; margin-top: 3px; }
+    .sev-minor { background: var(--surface-3); color: var(--text-dim); }
+    .finding-quote { color: var(--text-dim); font-style: italic; margin-top: 3px; }
     .review-verdict {
       padding: 12px 14px; border-radius: 8px; margin: 10px 0;
       background: var(--surface); border: 1px solid var(--border); font-size: 14px; line-height: 1.6;
@@ -648,20 +720,37 @@
 
     /* ── Skills tags ── */
     .skills-row {
-      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr);
+      gap: 4px 20px;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+      line-height: 1.6;
     }
+    .skills-row:first-child { border-top: none; padding-top: 0; }
 
     .skills-category {
       font-weight: 600;
-      font-size: 13px;
       color: var(--text-dim);
-      margin-right: 8px;
     }
 
     .skills-list {
-      font-size: 13px;
       color: var(--text);
-      font-family: var(--mono);
+      max-width: 72ch;
+    }
+
+    @media (max-width: 640px) {
+      .skills-row { grid-template-columns: 1fr; gap: 2px; }
+      .bullet-item { padding-left: 24px; padding-right: 6px; }
+      .bullet-item::before { left: 10px; }
+      .bullet-item.flagged::before { left: 9px; }
+      .overview-toggle { margin-left: 0; }
+      #results .section { padding: 18px 16px; }
+      .bullet-row { flex-direction: column; gap: 2px; }
+      .bullet-row .change-chip { order: -1; margin-top: 2px; }
+      .bullet-item.changed::before { top: 40px; }
+      .bullet-item.changed.flagged::before { top: 39px; }
     }
 
     /* ── Template Selector ── */
@@ -857,15 +946,15 @@
 
     /* ── Client sub-entry ── */
     .client-entry {
-      margin-left: 20px;
-      padding-left: 16px;
+      margin-left: 4px;
+      padding-left: 14px;
       border-left: 2px solid var(--border);
       margin-top: 8px;
     }
 
     .client-name {
-      font-weight: 500;
-      font-size: 14px;
+      font-weight: 600;
+      font-size: 14.5px;
       color: var(--text);
     }
   </style>
@@ -1169,17 +1258,17 @@
 
       <!-- Meta -->
       <div class="section">
-        <div class="section-title">Detected from JD</div>
+        <div class="section-title">Detected from the job description</div>
         <div class="meta-grid" id="meta-grid"></div>
       </div>
 
       <!-- Writing feedback: concrete signals, not a pseudo-precise rating -->
       <div class="section">
-        <div class="section-title">5-second resume review</div>
-        <div class="score-bar" style="display:block;">
+        <div class="section-title">Before you send</div>
+        <div class="score-bar review-card" id="review-card">
           <div class="review-headline" id="review-headline">Checking your resume…</div>
           <ul class="review-list" id="review-list"></ul>
-          <p class="review-caveat">These are writing checks, not an ATS score or a prediction of hiring outcomes. Verify every fact and metric before sending.</p>
+          <p class="review-caveat">Quick writing checks, not an ATS score. Verify every fact and metric before sending.</p>
         </div>
         <div id="timeline-warnings"></div>
         <div id="lint-strip"></div>
@@ -1190,14 +1279,20 @@
         </div>
       </div>
 
+      <!-- Overview of edits/flags in the resume below (filled by renderResumeOverview) -->
+      <div class="resume-overview" id="resume-overview" role="group" aria-label="Changes and flags"></div>
+
       <!-- Professional Summary -->
       <div class="section">
-        <div class="section-title">Professional Summary</div>
-        <p id="summary-text" style="font-size:14px;line-height:1.7;"></p>
+        <div class="section-head">
+          <div class="section-title">Professional Summary</div>
+          <span class="change-chip" id="summary-change-tag" hidden>Updated</span>
+        </div>
+        <p id="summary-text" class="summary-text"></p>
       </div>
 
       <!-- Skills -->
-      <div class="section">
+      <div class="section skills-section">
         <div class="section-title">Technical Skills</div>
         <div id="skills-container"></div>
       </div>
@@ -2025,14 +2120,16 @@
         ["Cloud", (pjd.cloud_platform || "—").toUpperCase()],
         ["Model", model_used || "—"],
       ];
-      if (usage) {
-        const cost = ((usage.prompt_tokens || 0) * 0.000003 + (usage.completion_tokens || 0) * 0.000015).toFixed(3);
-        metaItems.push(["Tokens", `${usage.prompt_tokens || "?"}/${usage.completion_tokens || "?"}`]);
-        metaItems.push(["Est. Cost", `${cost}`]);
-      }
+      let metaHtml = "";
       for (const [label, value] of metaItems) {
-        metaGrid.innerHTML += `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
+        metaHtml += `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${escapeHtml(String(value))}</div></div>`;
       }
+      if (usage) {
+        // Usage is diagnostic, so it sits on a quieter line under the JD facts.
+        const cost = ((usage.prompt_tokens || 0) * 0.000003 + (usage.completion_tokens || 0) * 0.000015).toFixed(3);
+        metaHtml += `<div class="meta-usage">Tokens ${escapeHtml(String(usage.prompt_tokens || "?"))} in / ${escapeHtml(String(usage.completion_tokens || "?"))} out · Est. cost $${cost}</div>`;
+      }
+      metaGrid.innerHTML = metaHtml;
 
       // Writing signals describe *why* a bullet may need work. The legacy
       // numeric heuristic is retained for old history records, not shown as a
@@ -2059,7 +2156,7 @@
       summaryEl.textContent = resumeData.professional_summary || "";
       const summaryChanged = !!previousResumeData && previousResumeData.professional_summary !== resumeData.professional_summary;
       summaryEl.classList.toggle("changed-summary", summaryChanged);
-      if (summaryChanged) summaryEl.insertAdjacentHTML("beforeend", '<span class="change-tag">Updated</span>');
+      document.getElementById("summary-change-tag").hidden = !summaryChanged;
 
       // Skills
       const skillsEl = document.getElementById("skills-container");
@@ -2067,7 +2164,7 @@
       if (resumeData.technical_skills) {
         for (const [cat, skills] of Object.entries(resumeData.technical_skills)) {
           if (!String(skills || "").trim()) continue;
-          skillsEl.innerHTML += `<div class="skills-row"><span class="skills-category">${escapeHtml(cat)}:</span><span class="skills-list">${escapeHtml(skills)}</span></div>`;
+          skillsEl.innerHTML += `<div class="skills-row"><div class="skills-category">${escapeHtml(cat)}</div><div class="skills-list">${escapeHtml(skills)}</div></div>`;
         }
       }
 
@@ -2085,32 +2182,45 @@
         }
       }
 
+      let expHtml = "";
       for (const [expIndex, exp] of (resumeData.experience || []).entries()) {
         const oldExp = previousResumeData?.experience?.[expIndex];
-        let html = `<div class="exp-entry">`;
-        html += `<div class="exp-company">${escapeHtml(exp.company || "")} <span class="exp-dates">${escapeHtml(exp.start_date || "")} — ${escapeHtml(exp.end_date || "")}</span></div>`;
+        let body = "";
+        let entryMarked = false;
+        const bulletList = (bullets, oldBullets) => {
+          let items = "";
+          let marked = false;
+          for (const [bulletIndex, bullet] of (bullets || []).entries()) {
+            const b = renderBullet(bullet, scoringMap, oldBullets?.[bulletIndex]);
+            if (/class="bullet-item[^"]*\b(?:changed|flagged)\b/.test(b)) marked = true;
+            items += b;
+          }
+          return { html: items ? `<ul class="bullet-list">${items}</ul>` : "", marked };
+        };
 
         if (exp.is_consulting && exp.clients) {
-          html += `<div class="exp-title">${escapeHtml(exp.title || "Software Engineer")} &middot; ${escapeHtml(exp.location || "")}</div>`;
+          body += titleLine(exp.title || "Software Engineer", exp.location);
           for (const [clientIndex, client] of exp.clients.entries()) {
-            html += `<div class="client-entry">`;
-            html += `<div class="client-name">Client: ${escapeHtml(client.client_name || "")} <span class="exp-dates">${escapeHtml(client.start_date || "")} — ${escapeHtml(client.end_date || "")}</span></div>`;
-            html += `<div class="exp-title">${escapeHtml(client.title || "")}</div>`;
-            for (const [bulletIndex, bullet] of (client.bullets || []).entries()) {
-              html += renderBullet(bullet, scoringMap, oldExp?.clients?.[clientIndex]?.bullets?.[bulletIndex]);
-            }
-            html += `</div>`;
+            const list = bulletList(client.bullets, oldExp?.clients?.[clientIndex]?.bullets);
+            entryMarked = entryMarked || list.marked;
+            body += `<div class="client-entry${list.marked ? "" : " no-marks"}">`;
+            body += `<div class="exp-head"><div class="client-name">Client: ${escapeHtml(client.client_name || "")}</div>${dateRange(client.start_date, client.end_date)}</div>`;
+            body += titleLine(client.title, client.location);
+            body += list.html + `</div>`;
           }
         } else {
-          html += `<div class="exp-title">${escapeHtml(exp.title || "")} &middot; ${escapeHtml(exp.location || "")}</div>`;
-          for (const [bulletIndex, bullet] of (exp.bullets || []).entries()) {
-            html += renderBullet(bullet, scoringMap, oldExp?.bullets?.[bulletIndex]);
-          }
+          body += titleLine(exp.title, exp.location);
+          const list = bulletList(exp.bullets, oldExp?.bullets);
+          entryMarked = list.marked;
+          body += list.html;
         }
 
-        html += `</div>`;
-        expEl.innerHTML += html;
+        expHtml += `<div class="exp-entry${entryMarked ? "" : " no-marks"}">` +
+          `<div class="exp-head"><div class="exp-company">${escapeHtml(exp.company || "")}</div>${dateRange(exp.start_date, exp.end_date)}</div>` +
+          body + `</div>`;
       }
+      expEl.innerHTML = expHtml;
+      renderResumeOverview(summaryChanged);
 
       // Staggered reveal animation
       document.getElementById("results").style.display = "block";
@@ -2164,6 +2274,7 @@
       if (long) issues.push(`${long} long bullet${long === 1 ? " may" : "s may"} slow a quick scan. Shorten only where meaning is preserved.`);
       const majorLint = lint.filter(f => f.severity === "major").length;
       if (majorLint) issues.push(`${majorLint} additional mechanical writing flag${majorLint === 1 ? "" : "s"} below; inspect the quoted text before changing it.`);
+      document.getElementById("review-card").classList.toggle("has-issues", issues.length > 0);
       document.getElementById("review-headline").textContent = bullets.length
         ? (issues.length ? `${issues.length} ${issues.length === 1 ? "thing" : "things"} to review before sending` : "No obvious writing flags in this quick check")
         : "No experience bullets to review yet";
@@ -2171,13 +2282,57 @@
         .map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
 
+    // Clean bullets render like a normal resume line. Only real edits get the
+    // "Updated" chip and only bullets with concrete bulletAdvice notes get a flag;
+    // the "verify every fact" caveat is shown once in the review card.
     function renderBullet(text, scoringMap, previousText) {
       const notes = bulletAdvice(String(text));
       const changed = previousText != null && previousText !== text;
-      const label = notes.length ? "Review" : "No quick flag";
-      const cls = notes.length ? "score-needs" : "score-good";
-      const reason = notes.length ? notes.slice(0, 2).join("; ") : "No quick writing flag; still verify the claim and its relevance";
-      return `<div class="bullet-item${changed ? " changed" : ""}"><div class="bullet-score ${cls}">${label}</div><div><div class="bullet-text">${escapeHtml(text)}${changed ? '<span class="change-tag">Updated</span>' : ""}</div><div class="bullet-reason">${escapeHtml(reason)}</div></div></div>`;
+      const cls = ["bullet-item", changed ? "changed" : "", notes.length ? "flagged" : ""].filter(Boolean).join(" ");
+      const note = notes.length ? `<div class="bullet-note"><strong>Review:</strong> ${escapeHtml(notes.slice(0, 2).join("; "))}</div>` : "";
+      return `<li class="${cls}"><div class="bullet-row"><div class="bullet-text">${escapeHtml(text)}</div>${changed ? '<span class="change-chip">Updated</span>' : ""}</div>${note}</li>`;
+    }
+
+    function titleLine(title, location) {
+      const parts = [title, location].map(v => String(v || "").trim()).filter(Boolean);
+      return parts.length ? `<div class="exp-title">${parts.map(escapeHtml).join(" &middot; ")}</div>` : "";
+    }
+
+    function dateRange(start, end) {
+      const parts = [start, end].map(v => String(v || "").trim()).filter(Boolean);
+      return parts.length ? `<div class="exp-dates">${parts.map(escapeHtml).join(" – ")}</div>` : "";
+    }
+
+    function renderResumeOverview(summaryChanged) {
+      const results = document.getElementById("results");
+      results.classList.remove("only-marks");
+      const el = document.getElementById("resume-overview");
+      const changed = document.querySelectorAll("#experience-container .bullet-item.changed").length;
+      const flagged = document.querySelectorAll("#experience-container .bullet-item.flagged").length;
+      if (!changed && !flagged && !summaryChanged) { el.innerHTML = ""; return; }
+      const parts = [];
+      if (changed || summaryChanged) {
+        const label = [changed ? `${changed} bullet${changed === 1 ? "" : "s"}` : "", summaryChanged ? "summary" : ""].filter(Boolean).join(" + ");
+        parts.push(`<button type="button" class="overview-count" onclick="jumpToNextMark('changed')" title="Jump to the next update"><span class="overview-swatch sw-changed"></span>${label} updated</button>`);
+      }
+      parts.push(flagged
+        ? `<button type="button" class="overview-count" onclick="jumpToNextMark('flagged')" title="Jump to the next flagged bullet"><span class="overview-swatch sw-flag"></span>${flagged} bullet${flagged === 1 ? "" : "s"} to review</button>`
+        : `<span class="overview-count" aria-disabled="true"><span class="overview-swatch sw-flag"></span>No bullets flagged</span>`);
+      parts.push(`<label class="overview-toggle"><input type="checkbox" id="only-marks-toggle" onchange="document.getElementById('results').classList.toggle('only-marks', this.checked)"> Show only changes and flags</label>`);
+      el.innerHTML = parts.join("");
+    }
+
+    let jumpIndex = { changed: -1, flagged: -1 };
+    function jumpToNextMark(kind) {
+      const selector = kind === "changed" ? "#summary-text.changed-summary, #experience-container .bullet-item.changed" : "#experience-container .bullet-item.flagged";
+      const targets = [...document.querySelectorAll(selector)];
+      if (!targets.length) return;
+      jumpIndex[kind] = (jumpIndex[kind] + 1) % targets.length;
+      const target = targets[jumpIndex[kind]];
+      document.querySelectorAll(".jump-target").forEach(n => n.classList.remove("jump-target"));
+      target.classList.add("jump-target");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => target.classList.remove("jump-target"), 1600);
     }
 
     function escapeHtml(str) {
@@ -2193,7 +2348,8 @@
       if (!lint || lint.length === 0) { el.innerHTML = ""; return; }
       const majors = lint.filter(f => f.severity !== "minor").length;
       const minors = lint.length - majors;
-      let html = `<details class="lint-details"><summary>Recruiter lint: ${majors} major, ${minors} minor — mechanical AI-tells a screener would spot</summary>`;
+      const counts = [majors ? `${majors} to fix` : "", minors ? `${minors} minor` : ""].filter(Boolean).join(", ");
+      let html = `<details class="lint-details"><summary>${lint.length} wording note${lint.length === 1 ? "" : "s"} (${counts}) <span class="lint-sub">· AI-tells a screener might spot</span></summary>`;
       for (const f of lint) {
         html += `<div class="lint-item"><span class="sev sev-${escapeHtml(f.severity)}">${escapeHtml(f.severity)}</span><span>${escapeHtml(f.message)}${f.quote ? `<div class="finding-quote">"${escapeHtml(f.quote)}"</div>` : ""}</span></div>`;
       }
