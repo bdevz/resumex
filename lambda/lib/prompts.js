@@ -3,6 +3,7 @@
 // ============================================================================
 
 const { resolveDomain } = require("./domains");
+const { findConsistencyIssues } = require("./consistency");
 
 // Certifications schema fragment + instruction, injected only when opted in.
 function certSchema(c, on) {
@@ -19,6 +20,19 @@ function certSchema(c, on) {
 // Domain-specific context block (empty for the software pack ⇒ no change).
 function domainContextBlock(c) {
   return c.DOMAIN_CONTEXT ? `\n${c.DOMAIN_CONTEXT}\n` : "";
+}
+
+// Timeline + cloud + employer-name rules shared by every generation prompt.
+// lib/consistency.js enforces the same rules deterministically after generation.
+function consistencyRulesBlock(c) {
+  return `TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
+${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
+
+CRITICAL: Check EVERY bullet against this timeline. A technology may appear in a role only if the role's END date is in or after the year listed. If a role ended before that year, do NOT mention that technology in it; use an older equivalent instead (e.g., "NLP pipeline" instead of "RAG", "Jenkins" instead of "GitHub Actions"). This overrides JD keyword matching AND the original resume's wording: if the source resume places a technology in a role that ended before it existed, rewrite it with an era-appropriate equivalent.
+
+EMPLOYER NAMES: Use the name the employer had during the role (e.g., "Facebook", not "Meta", for a role that ended before October 2021; "Twitter", not "X", before mid-2023). Keep the same employer; only the name changes.
+
+CLOUD CONSISTENCY (HARD CONSTRAINT): Each role uses ONE cloud provider. If the employer is publicly known for a provider (e.g., Amazon, Expedia/VRBO, Netflix, Airbnb, Capital One → AWS; Microsoft, LinkedIn, GitHub → Azure; Google, YouTube, Spotify → GCP), use only that provider's services in that role even if the JD asks for another. Never mix AWS, Azure and GCP services in the same bullet or the same role unless the bullet explicitly describes a migration between them. For employers with no known provider, use the JD's cloud consistently within the role. Only list cloud skills that the experience section actually uses.`;
 }
 
 function buildSystemPrompt(domain, includeCertifications) {
@@ -110,10 +124,7 @@ COMPANY & DOMAIN CONTEXT:
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
   in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildSystemPromptXL(domain, includeCertifications) {
@@ -212,10 +223,7 @@ COMPANY & DOMAIN CONTEXT:
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
   in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildSystemPromptExtended(domain, includeCertifications) {
@@ -327,10 +335,7 @@ COMPANY & DOMAIN CONTEXT:
 - If the user provides a description of what they did at a company, use it to anchor the bullet points
   in realistic scenarios. Treat this mode as an illustrative draft; do not represent invented metrics or work as verified candidate facts.
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts in 2022 or earlier, do NOT mention RAG, LangChain, or other post-2022 technologies in that role's bullets. Use older equivalent technologies instead (e.g., use "NLP pipeline" or "information retrieval" instead of "RAG" for pre-2023 roles). This constraint takes PRIORITY over keyword density.`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildUserMessage(jd, customer, context, companies, domain) {
@@ -511,10 +516,9 @@ function scoreBullet(bullet, c) {
 }
 
 function validateTimeline(resumeData, domain) {
-  const c = resolveDomain(domain);
   const warnings = [];
-  
-  if (!resumeData.experience || resumeData.experience.length === 0) {
+
+  if (!resumeData || !Array.isArray(resumeData.experience) || resumeData.experience.length === 0) {
     return warnings;
   }
 
@@ -525,14 +529,15 @@ function validateTimeline(resumeData, domain) {
       startDate: parseDate(exp.start_date),
       endDate: parseDate(exp.end_date)
     }))
+    .filter(exp => !isNaN(exp.startDate) && !isNaN(exp.endDate))
     .sort((a, b) => b.endDate - a.endDate); // Most recent first
 
   for (let i = 0; i < sortedExperience.length - 1; i++) {
     const current = sortedExperience[i];
     const next = sortedExperience[i + 1];
-    
+
     const gap = (current.startDate - next.endDate) / (1000 * 60 * 60 * 24 * 30); // Gap in months
-    
+
     if (gap > 2) {
       warnings.push(`Gap of ${Math.round(gap)} months between ${next.company} and ${current.company}`);
     } else if (gap < -1) {
@@ -540,34 +545,26 @@ function validateTimeline(resumeData, domain) {
     }
   }
 
-  // Check for unrealistic technology timeline
-  // Use word boundary regex to avoid false positives (e.g. "rag" matching "storage")
-  for (const exp of resumeData.experience) {
-    const expYear = parseDate(exp.start_date).getFullYear();
-
-    for (const bullet of exp.bullets || []) {
-      const lowerBullet = bullet.toLowerCase();
-      for (const [tech, timeline] of Object.entries(c.TECH_TIMELINE)) {
-        const escaped = tech.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`\\b${escaped}\\b`);
-        if (regex.test(lowerBullet) && expYear < timeline.earliest) {
-          warnings.push(`${tech} mentioned in ${exp.company} (${exp.start_date}) but technology wasn't available until ${timeline.earliest}`);
-        }
-      }
-    }
-  }
+  // Technology-era, employer-name and cloud-consistency problems that remain
+  // after lib/consistency.js enforcement (normally none).
+  warnings.push(...findConsistencyIssues(resumeData, domain));
 
   return warnings;
 }
 
 function parseDate(dateStr) {
-  // Parse "MMM YYYY" format
-  const [month, year] = dateStr.split(" ");
+  // Parse "MMM YYYY" format; "Present"/"Current" means today.
+  const s = String(dateStr || "").trim();
+  if (/present|current|now|today|ongoing/i.test(s)) {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+  const [month, year] = s.split(" ");
   const monthMap = {
     "Jan": 0, "Feb": 1, "Mar": 2, "Apr": 3, "May": 4, "Jun": 5,
     "Jul": 6, "Aug": 7, "Sep": 8, "Oct": 9, "Nov": 10, "Dec": 11
   };
-  
+  if (year === undefined && /^\d{4}$/.test(month || "")) return new Date(parseInt(month), 0, 1);
   return new Date(parseInt(year), monthMap[month] || 0, 1);
 }
 
@@ -665,10 +662,7 @@ BUSINESS VALUE MIX (per role):
 - 2-3 bullets: Technical achievement — performance gains, architecture, system design
 - 1-2 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildOptimizeSystemPromptXL(domain, includeCertifications) {
@@ -765,10 +759,7 @@ With 10-15 bullets, mix these types:
 - 4-5 bullets: Technical achievement — performance gains, architecture, system design, migrations
 - 2-3 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildOptimizeSystemPromptExtended(domain, includeCertifications) {
@@ -874,10 +865,7 @@ With 18-26 bullets, mix these types:
 - 8-12 bullets: Technical achievement — performance gains, architecture, system design, migrations
 - 4-6 bullets: Leadership/collaboration — team size, cross-functional work, stakeholder management
 
-TECHNOLOGY TIMELINE (HARD CONSTRAINT — violations are unacceptable):
-${Object.entries(c.TECH_TIMELINE).map(([tech, t]) => `- ${tech}: not before ${t.earliest}`).join("\n")}
-
-CRITICAL: Check EVERY bullet against this timeline. If a role starts before the year listed, do NOT mention that technology. This constraint takes PRIORITY over keyword density. Use older equivalent technologies instead (e.g., "NLP pipeline" instead of "RAG" for pre-2023 roles).`;
+${consistencyRulesBlock(c)}`;
 }
 
 function buildOptimizeUserMessage(resume, jd, context) {
@@ -1065,7 +1053,7 @@ function buildRevisePrompt(domain, len, includeCertifications) {
 REVISION MODE — SURGICAL FIXES ONLY:
 You are revising a resume you already wrote, to resolve a specific list of recruiter findings. Rules:
 - Fix EXACTLY the findings listed in the user message. Change nothing else.
-- Keep every company, title, date, and the overall voice identical.
+- Keep every company, title, date, and the overall voice identical (still apply the timeline, employer-name and cloud rules above).
 - A rewritten bullet must keep its factual claim unless the finding says the claim itself is implausible — then remove or qualify the unsupported claim. Never replace it with an invented 'believable' number.
 - Do not introduce new AI-tell vocabulary, em-dashes, or uniform bullet shapes while fixing.
 - Return the COMPLETE revised resume JSON in the same schema — not a diff, not only the changed parts.`;
