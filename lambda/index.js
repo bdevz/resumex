@@ -14,6 +14,7 @@
 const { buildSystemPrompt, buildSystemPromptXL, buildSystemPromptExtended, buildUserMessage, buildOptimizeSystemPrompt, buildOptimizeSystemPromptXL, buildOptimizeSystemPromptExtended, buildOptimizeUserMessage, buildReviewerPrompt, buildReviewerUserMessage, buildRevisePrompt, buildReviseUserMessage, scoreResume, validateTimeline } = require("./lib/prompts");
 const { lintResume } = require("./lib/review");
 const { buildResume } = require("./lib/docx-builder");
+const { enforceConsistency } = require("./lib/consistency");
 const config = require("./lib/config");
 const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
@@ -419,14 +420,18 @@ async function handleAnalyze(body) {
     });
   }
 
-  const scoring = scoreResume(resumeData, dom);
-  const timeline_warnings = validateTimeline(resumeData, dom);
+  // Deterministically enforce technology timeline, employer names and cloud
+  // consistency; prompts alone are not reliable enough.
+  const { resumeData: checked, fixes: consistency_fixes } = enforceConsistency(resumeData, { domain: dom });
+  const scoring = scoreResume(checked, dom);
+  const timeline_warnings = validateTimeline(checked, dom);
 
   return response(200, {
-    resumeData,
+    resumeData: checked,
     scoring,
     timeline_warnings,
-    lint: lintResume(resumeData, { length: len }),
+    consistency_fixes,
+    lint: lintResume(checked, { length: len }),
     model_used: r.modelUsed,
     usage: r.usage,
   });
@@ -472,14 +477,18 @@ async function handleOptimize(body) {
     });
   }
 
-  const scoring = scoreResume(resumeData, dom);
-  const timeline_warnings = validateTimeline(resumeData, dom);
+  // Deterministically enforce technology timeline, employer names and cloud
+  // consistency; prompts alone are not reliable enough.
+  const { resumeData: checked, fixes: consistency_fixes } = enforceConsistency(resumeData, { domain: dom });
+  const scoring = scoreResume(checked, dom);
+  const timeline_warnings = validateTimeline(checked, dom);
 
   return response(200, {
-    resumeData,
+    resumeData: checked,
     scoring,
     timeline_warnings,
-    lint: lintResume(resumeData, { length: len }),
+    consistency_fixes,
+    lint: lintResume(checked, { length: len }),
     model_used: r.modelUsed,
     usage: r.usage,
     mode: "optimize",
@@ -598,11 +607,13 @@ async function handleRevise(body) {
     });
   }
 
+  const { resumeData: checkedRevised, fixes: consistency_fixes } = enforceConsistency(revised, { domain: dom });
   return response(200, {
-    resumeData: revised,
-    scoring: scoreResume(revised, dom),
-    timeline_warnings: validateTimeline(revised, dom),
-    lint: lintResume(revised, { length: len }),
+    resumeData: checkedRevised,
+    scoring: scoreResume(checkedRevised, dom),
+    timeline_warnings: validateTimeline(checkedRevised, dom),
+    consistency_fixes,
+    lint: lintResume(checkedRevised, { length: len }),
     model_used: r.modelUsed,
     usage: r.usage,
     mode: "revise",
@@ -836,9 +847,10 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
     }
 
     // Parse complete response and expand short keys to full keys
-    const resumeData = expandKeys(extractJSON(fullText));
+    const parsed = expandKeys(extractJSON(fullText));
 
-    if (resumeData) {
+    if (parsed) {
+      const { resumeData, fixes: consistency_fixes } = enforceConsistency(parsed, { domain: dom });
       const scoring = scoreResume(resumeData, dom);
       const timeline_warnings = validateTimeline(resumeData, dom);
 
@@ -847,6 +859,7 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
         resumeData,
         scoring,
         timeline_warnings,
+        consistency_fixes,
         lint: lintResume(resumeData, { length: len }),
         model_used: m.id,
         mode: mode === "optimize" ? "optimize" : undefined,
@@ -981,6 +994,7 @@ exports.handler = async (event) => {
           resumeData: resultBody.resumeData,
           scoring: resultBody.scoring,
           timeline_warnings: resultBody.timeline_warnings,
+          consistency_fixes: resultBody.consistency_fixes || [],
           lint: resultBody.lint,
           reviewer_model: resultBody.reviewer_model,
           verdict: resultBody.verdict,

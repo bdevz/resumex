@@ -50,13 +50,14 @@ function buildHistoryRecord({ id, userName, createdAt, body = {}, resultBody = {
     // re-rendered later exactly as it first appeared.
     scoring: resultBody.scoring || null,
     timelineWarnings: resultBody.timeline_warnings || [],
+    consistencyFixes: resultBody.consistency_fixes || [],
     resumeData,
   };
 }
 
 // List/admin views only need metadata — drop the heavy blobs.
 function summarize(record) {
-  const { resumeData, scoring, timelineWarnings, ...rest } = record;
+  const { resumeData, scoring, timelineWarnings, consistencyFixes, ...rest } = record;
   return rest;
 }
 

@@ -2144,6 +2144,12 @@
           warningsEl.innerHTML += `<div class="warning-item">${escapeHtml(w)}</div>`;
         }
       }
+      // Automatic timeline / employer-name / cloud-consistency corrections
+      const fixes = data.consistency_fixes || [];
+      if (fixes.length) {
+        warningsEl.innerHTML += `<details class="lint-details consistency-fixes"><summary>Auto-corrected ${fixes.length} timeline or cloud ${fixes.length === 1 ? "issue" : "issues"} (tech that didn't exist yet, old employer names, mixed clouds)</summary>` +
+          fixes.map(f => `<div class="lint-item"><span>${escapeHtml(f)}</span></div>`).join("") + `</details>`;
+      }
 
       // Recruiter lint strip + reset any previous review panel
       renderLintStrip(data.lint);
@@ -2619,6 +2625,7 @@
           resumeData: rec.resumeData,
           scoring: rec.scoring || { results: [], average: rec.score, bulletCount: 0 },
           timeline_warnings: rec.timelineWarnings || [],
+          consistency_fixes: rec.consistencyFixes || [],
           model_used: rec.model,
           usage: null,
           mode: rec.mode,
