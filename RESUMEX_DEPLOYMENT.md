@@ -1,35 +1,59 @@
 # ResumeX Deployment Guide
 
-Deploy ResumeX using the AWS Deployment Template system.
+## Compatible provider routing
 
-## Prerequisites
+The deployed runtime uses `lambda/` and `frontend/index.html`. Root-level
+`index.js` and `index.html` are legacy copies.
 
-1. **AWS CLI** installed and configured (`aws configure`)
-2. **Node.js** installed (v18+)
-3. **OpenRouter API key** from https://openrouter.ai/keys
+Configure `OPENAI_BASE_URL` and `OPENAI_API_KEY` for OpenAI-compatible models,
+including GPT-5.6 and GPT-6. Configure `ANTHROPIC_BASE_URL` and
+`ANTHROPIC_API_KEY` for Claude. Base URLs accept a service root or `/v1` suffix;
+when omitted, the standard OpenAI and Anthropic endpoints remain the defaults.
+These routes cover generation, optimization, review, revision, and streaming.
 
-## Quick Deployment
+The current production path uses an authenticated HTTPS relay that forwards to
+EasyCLIProxyAPI on a separate Mac over a private network. Verify the catalog on
+the actual upstream host: different proxy instances can expose different models.
+A private network address alone is not reachable by a Lambda without network
+connectivity to it. Keep credentials out of source and frontend code.
 
-### 1. Install Dependencies
+### Restricted relay
 
-```bash
-# Install deployment template dependencies
-npm install
+Run `scripts/proxy-relay.js` using Node 22 as a persistent user service. It binds
+to `127.0.0.1:8318` and defaults to the local proxy on port 8317. It reads the
+client key from EasyCLIProxyAPI's existing configuration (`CPA_CONFIG_PATH` can
+override the path), or accepts `RELAY_API_KEY` from the service environment.
 
-# Install Lambda dependencies
-cd lambda && npm install && cd ..
+For a remote proxy, configure:
 
-# Build the deployment template
-npm run build
-```
+- `RELAY_UPSTREAM_URL`: an HTTP(S) origin; use HTTPS for remote hosts.
+- `RELAY_UPSTREAM_KEY_FILE`: an owner-only file in the host's credential store
+  containing the upstream key. Keep its directory mode 0700 and file mode 0600.
 
-### 2. Configure Environment Variables
+The relay validates the client key before replacing upstream authentication.
+TLS certificate verification remains enabled. Restart after rotating credentials.
+Only these exact authenticated routes are exposed:
 
-You'll need to set these during deployment:
-- `ANTHROPIC_API_KEY`: Your Anthropic API key (sk-ant-...)
-- `OPENAI_API_KEY`: Your OpenAI API key (optional — enables the GPT models)
-- `SHARED_PASSPHRASE`: Team passphrase for accessing the app
-- `ADMIN_PASSPHRASE`: Separate passphrase that unlocks the Admin usage-review view
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+- `POST /v1/messages`
+
+Management routes, arbitrary targets, query strings and unsupported methods are
+blocked. Request bodies are limited to 6 MiB; streaming and upstream errors are
+preserved. Expose the relay, not the full proxy, through the existing HTTPS
+entrypoint. Both proxy hosts and their private network must remain online.
+
+### Validation and recovery
+
+Run `node --test scripts/proxy-relay.test.js lambda/lib/__tests__/*.test.js`.
+Verify the authenticated upstream catalog, missing/wrong key rejection,
+management-route rejection, and one synthetic resume through the public UI.
+
+Save the active service configuration before changing the upstream. Restoring
+that configuration and restarting only the relay restores its previous route.
+For Lambda changes, save the current version, use a targeted code update and
+merge environment values. `deploy.sh` replaces the environment and can wipe
+existing keys. Do not use it for a routing-only repair.
 
 ### 3. Deploy
 

@@ -8,6 +8,9 @@
 //
 // Environment variables (set in Lambda console):
 //   ANTHROPIC_API_KEY   — Your Anthropic API key
+//   ANTHROPIC_BASE_URL  — Optional compatible API base URL (root or /v1)
+//   OPENAI_API_KEY      — OpenAI or compatible proxy API key
+//   OPENAI_BASE_URL     — Optional compatible API base URL (root or /v1)
 //   SHARED_PASSPHRASE   — Passphrase shared with team
 // ============================================================================
 
@@ -20,6 +23,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } = r
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 const { userSlug, historyKey, buildHistoryRecord, summarize } = require("./lib/history");
 const crypto = require("crypto");
+const { llmEndpoint } = require("./lib/llm-endpoints");
 
 const s3 = new S3Client({ region: "us-east-1" });
 const lambda = new LambdaClient({ region: "us-east-1" });
@@ -237,7 +241,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeout
   let apiResponse;
   try {
     if (m.provider === "openai") {
-      apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      apiResponse = await fetch(llmEndpoint("openai"), {
         method: "POST",
         // Slow thinking models (Fable 5/5.1 at high effort) can run for many
         // minutes; the async-job pattern keeps the client off this call, so
@@ -259,7 +263,7 @@ async function callLLM(modelInput, systemPrompt, userMessage, maxTokens, timeout
         }),
       });
     } else {
-      apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      apiResponse = await fetch(llmEndpoint("anthropic"), {
         method: "POST",
         signal: AbortSignal.timeout(timeoutMs),
         headers: {
@@ -750,7 +754,7 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
     let apiResponse;
     try {
       if (m.provider === "openai") {
-        apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        apiResponse = await fetch(llmEndpoint("openai"), {
           method: "POST",
           signal: AbortSignal.timeout(840_000),
           headers: {
@@ -769,7 +773,7 @@ if (typeof awslambda !== "undefined" && typeof awslambda.streamifyResponse === "
           }),
         });
       } else {
-        apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        apiResponse = await fetch(llmEndpoint("anthropic"), {
           method: "POST",
           signal: AbortSignal.timeout(840_000),
           headers: {
